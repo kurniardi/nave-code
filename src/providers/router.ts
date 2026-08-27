@@ -150,7 +150,9 @@ export class ModelRouter {
     }
 
     // Size: bigger is better, but only while it fits in VRAM.
-    const plan = planRuntime({ profile, gpu: this.gpu, config: this.config });
+    // Must go through plan() so the already-resident model is credited back;
+    // otherwise a loaded model is penalised for occupying its own memory.
+    const plan = this.plan(profile);
     const params = profile.paramsB ?? 7;
     if (plan.fitsFully) {
       const sizeBonus = Math.min(3, Math.log2(Math.max(1, params)) * 0.8);

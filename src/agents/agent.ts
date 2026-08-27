@@ -11,6 +11,8 @@ import { protocolInstructions, parseProtocol } from '../prompt/protocol.ts';
 import type { ChatMessage, ModelProfile, ToolCall } from '../providers/types.ts';
 import type { RuntimePlan } from '../gpu/tuning.ts';
 import { estimateTokens } from '../util/tokens.ts';
+import { contextBudget, tokensToChars } from '../core/budget.ts';
+import type { ContextBudget } from '../core/budget.ts';
 
 export interface AgentEvents {
   onText?(chunk: string): void;
@@ -60,8 +62,6 @@ export interface RunResult {
   tokensPerSecond: number | null;
 }
 
-const MAX_TOOL_RESULT_CHARS = 24_000;
-
 export class Agent {
   private services: Services;
   private def: AgentDef;
@@ -73,6 +73,7 @@ export class Agent {
   private readFiles: Set<string>;
   private isSubAgent: boolean;
   private modelOverride?: string;
+  private budget: ContextBudget = contextBudget(8192);
 
   constructor(opts: RunOptions) {
     this.services = opts.services;
@@ -123,18 +124,21 @@ export class Agent {
     const plan = services.router.plan(profile);
     for (const note of plan.notes) this.events.onNotice?.(note);
 
-    // 3. Tools.
+    // 3. Budgets, then tools sized to them.
+    const budget = contextBudget(plan.numCtx, services.config.ui.compactAtPercent);
+    this.budget = budget;
+
     const selection = selectTools({
       allow: this.def.tools,
       paramsB: profile.paramsB,
       hasSkills: services.skills.count > 0,
       memoryEnabled: services.config.memory.enabled,
       canDelegate: this.depth < services.config.agents.maxDepth && !this.isSubAgent,
+      compact: budget.tight,
     });
     const toolMode: 'native' | 'prompted' = profile.supportsTools ? 'native' : 'prompted';
 
-    // 4. System prompt. Reserve ~35% of the window for the conversation.
-    const budget = Math.floor(plan.numCtx * 0.45);
+    // 4. System prompt, capped so the conversation still has room.
     const built = buildSystemPrompt({
       services,
       agent: this.def,
@@ -142,7 +146,8 @@ export class Agent {
       tools: selection.tools,
       mode: this.permissions.currentMode,
       isSubAgent: this.isSubAgent,
-      budgetTokens: budget,
+      budgetTokens: budget.system,
+      tight: budget.tight,
     });
     let systemText = built.text;
     if (toolMode === 'prompted') {
@@ -171,7 +176,7 @@ export class Agent {
 
     // 5. The loop.
     const maxSteps = this.def.maxSteps ?? services.config.agents.maxSteps;
-    const compactAt = Math.floor(plan.numCtx * (services.config.ui.compactAtPercent / 100));
+    const compactAt = budget.compactAt;
     let steps = 0;
     let promptTokens = 0;
     let completionTokens = 0;
@@ -268,8 +273,8 @@ export class Agent {
           tool_name: toolMode === 'native' ? call.function.name : undefined,
           content:
             toolMode === 'native'
-              ? clip(result.content)
-              : `[Result of ${call.function.name}]\n${clip(result.content)}`,
+              ? clip(result.content, budget.toolResult)
+              : `[Result of ${call.function.name}]\n${clip(result.content, budget.toolResult)}`,
         });
       }
     }
@@ -351,6 +356,7 @@ export class Agent {
       depth: this.depth,
       emit: (line) => this.events.onNotice?.(line),
       readFiles: this.readFiles,
+      resultTokens: this.budget.toolResult,
       spawnAgent: (req) => this.spawnSubAgent(req, signal),
     };
   }
@@ -421,11 +427,18 @@ export class Agent {
   }
 }
 
-function clip(s: string): string {
-  if (s.length <= MAX_TOOL_RESULT_CHARS) return s;
-  const head = Math.floor(MAX_TOOL_RESULT_CHARS * 0.7);
+/** Keep the head and tail of an oversized tool result; the middle rarely matters. */
+function clip(s: string, maxTokens: number): string {
+  const max = tokensToChars(maxTokens);
+  if (s.length <= max) return s;
+  const head = Math.floor(max * 0.7);
   return (
-    `${s.slice(0, head)}\n\n… [${s.length - MAX_TOOL_RESULT_CHARS} characters trimmed from the middle] …\n\n` +
-    s.slice(s.length - (MAX_TOOL_RESULT_CHARS - head))
+    `${s.slice(0, head)}
+
+… [${s.length - max} characters trimmed to fit the context window; ` +
+    `narrow the search or read a smaller range] …
+
+` +
+    s.slice(s.length - (max - head))
   );
 }

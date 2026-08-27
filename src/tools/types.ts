@@ -32,6 +32,8 @@ export interface ToolContext {
   spawnAgent?: (req: AgentSpawnRequest) => Promise<string>;
   /** Files the model has read this session; write/edit require a prior read. */
   readFiles: Set<string>;
+  /** How much a single tool result may return, in tokens. */
+  resultTokens: number;
 }
 
 export interface Tool {

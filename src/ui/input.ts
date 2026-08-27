@@ -1,6 +1,7 @@
 import { createInterface } from 'node:readline/promises';
 import { c, accent, muted } from '../util/colors.ts';
 import { suspendSpinner, panel } from './render.ts';
+import { PasteFilter, expandPastes, pasteMarker, PASTE_ON, PASTE_OFF } from './paste.ts';
 
 /**
  * Single owner of stdin, one prompt at a time.
@@ -116,14 +117,32 @@ export class InputController {
 
     const restoreSpinner = suspendSpinner();
 
+    // Multi-line pastes are pulled out of the stream and held here, so
+    // readline never sees the newlines that would submit each line on its own.
+    const pastes: string[] = [];
+    const filter = new PasteFilter({
+      onPaste: (text) => {
+        if (!text.includes('\n')) {
+          rl.write(text);
+          return;
+        }
+        const lines = text.split('\n').length;
+        pastes.push(text);
+        rl.write(pasteMarker(pastes.length, lines));
+      },
+    });
     const rl = createInterface({
-      input: process.stdin,
+      input: filter,
       output: process.stdout,
-      terminal: process.stdin.isTTY === true,
+      terminal: true,
       history: [...this.history],
       historySize: 200,
       removeHistoryDuplicates: true,
     });
+
+    // Only now can data reach onPaste, which needs `rl` to exist.
+    process.stdin.pipe(filter);
+    process.stdout.write(PASTE_ON);
 
     let interrupted = false;
     rl.on('SIGINT', () => {
@@ -146,11 +165,20 @@ export class InputController {
       }
       const history = (rl as unknown as { history?: string[] }).history;
       if (Array.isArray(history)) this.history = [...history];
-      return { kind: 'line', value: answer };
+      const value = expandPastes(answer, pastes);
+      if (pastes.length) {
+        process.stdout.write(
+          muted(`  (${pastes.length} pasted block${pastes.length === 1 ? '' : 's'} expanded)\n`)
+        );
+      }
+      return { kind: 'line', value };
     } catch {
       return { kind: 'eof' };
     } finally {
+      process.stdout.write(PASTE_OFF);
       rl.close();
+      process.stdin.unpipe(filter);
+      filter.destroy();
       this.release();
       restoreSpinner();
     }

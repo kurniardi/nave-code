@@ -46,6 +46,9 @@ genuinely different code.
   ANSI or table padding.
 - All interactive input goes through `InputController` in `src/ui/input.ts`.
   Never open a second `readline` on stdin; see the `one-owner-of-stdin` memory.
+- Never hard-code a token or character limit. Derive it from
+  `contextBudget()` in `src/core/budget.ts`; on a 6 GB card the window is
+  ~10k and fixed constants overflow it before the first message.
 
 ## Architecture
 

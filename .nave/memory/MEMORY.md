@@ -19,5 +19,8 @@ Loaded at the start of every nave session — keep it short and true.
 
 ## Gotcha
 
+- [Every context limit scales with the window](budgets-scale-with-the-window.md) — Fixed token/char constants overflow a 10k window before the first message; src/core/budget.ts derives every limit from numCtx.
+- [The launcher must not run a stale dist](launcher-prefers-fresh-source.md) — bin/nave.mjs compares dist mtime against the newest src/*.ts, or an old build silently shadows your edits.
+- [Multi-line paste has to be intercepted before readline](paste-must-bypass-readline.md) — readline treats every pasted newline as Enter; PasteFilter strips bracketed-paste markers and holds the text aside.
 - [Local models print tool calls as text — recover them](recover-text-tool-calls.md) — Even tool-capable models sometimes emit a JSON call in the reply body and then claim it ran; Agent.run parses those back out.
 - [The VRAM budget must add back the resident model](vram-budget-counts-resident-model.md) — nvidia-smi reports an already-loaded model as used VRAM; without adding it back, every run after the first needlessly offloads layers to CPU.

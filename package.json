@@ -17,7 +17,7 @@
     "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "doctor": "node src/index.ts doctor",
-    "test": "node scripts/test-input.ts"
+    "test": "node scripts/test-input.ts && node scripts/test-paste.ts"
   },
   "files": [
     "bin",

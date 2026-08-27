@@ -1,8 +1,9 @@
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { c, accent, muted } from '../util/colors.ts';
-import { heading, table, bar, errorBox } from '../ui/render.ts';
-import { formatTokens } from '../util/tokens.ts';
+import { heading, table, bar, errorBox, panel } from '../ui/render.ts';
+import { formatTokens, estimateTokens } from '../util/tokens.ts';
+import { contextBudget } from '../core/budget.ts';
 import { formatMb } from '../gpu/detect.ts';
 import { serverEnvRecommendations } from '../gpu/tuning.ts';
 import { recommendedPulls } from '../providers/catalog.ts';
@@ -424,26 +425,70 @@ export const COMMANDS: SlashCommand[] = [
 
   {
     name: 'context',
-    summary: 'Show how full the context window is',
+    summary: 'Show where the context window is going',
     run(_args, ctx) {
       const pick = ctx.services.router.pick('orchestrator');
-      const plan = pick ? ctx.services.router.plan(pick.profile) : null;
-      const used = ctx.session.tokens();
-      const max = plan?.numCtx ?? 8192;
+      if (!pick) return { output: muted('No model selected.') };
+
+      const plan = ctx.services.router.plan(pick.profile);
+      const budget = contextBudget(plan.numCtx, ctx.services.config.ui.compactAtPercent);
+
+      const system = ctx.session.systemPrompt
+        ? estimateTokens(ctx.session.systemPrompt)
+        : budget.system;
+      const conversation = Math.max(0, ctx.session.tokens() - system);
+      const used = system + conversation;
+      const free = Math.max(0, budget.total - used);
+
+      const row = (label: string, tokens: number, note: string) =>
+        [
+          `  ${label.padEnd(14)}`,
+          `${formatTokens(tokens).padStart(6)}`,
+          `${String(Math.round((tokens / budget.total) * 100)).padStart(3)}%`,
+          muted(note),
+        ].join('  ');
+
+      const out = [
+        heading(`Context · ${pick.model}`),
+        `  ${bar(used / budget.total, 30)}  ${formatTokens(used)} / ${formatTokens(budget.total)}`,
+        '',
+        row('system prompt', system, 'instructions, memory index, tool list'),
+        row('conversation', conversation, `${ctx.session.messages.length} messages, ${ctx.session.turns} turns`),
+        row('free', free, free > budget.response ? 'room to keep working' : c.yellow('compaction is close')),
+        '',
+        muted(`  One tool result may return at most ${formatTokens(budget.toolResult)} tokens.`),
+        muted(`  Compaction fires at ${formatTokens(budget.compactAt)} — or run /compact now.`),
+      ];
+
       const stats = ctx.lastStats;
-      return {
-        output: [
-          heading('Context'),
-          `${bar(used / max, 28)}  ${formatTokens(used)} / ${formatTokens(max)} tokens (${Math.round((used / max) * 100)}%)`,
+      if (stats) {
+        out.push(
           '',
-          `messages: ${ctx.session.messages.length}    turns: ${ctx.session.turns}`,
-          stats
-            ? `last turn: ${stats.steps} step(s), ${formatTokens(stats.completionTokens)} generated${stats.tps ? ` at ${stats.tps.toFixed(1)} tok/s` : ''}`
-            : muted('no completed turns yet'),
+          muted(
+            `  Last turn: ${stats.steps} step(s), ${formatTokens(stats.completionTokens)} generated` +
+              (stats.tps ? ` at ${stats.tps.toFixed(1)} tok/s` : '')
+          )
+        );
+      }
+
+      if (budget.tight) {
+        const maxCtx = ctx.services.router.maxUsableContext(pick.profile);
+        const hints: string[] = [
+          `${c.bold(pick.model)} leaves only ${formatTokens(budget.total)} of context on this GPU,`,
+          'so nave is already running in compact mode: shorter tool descriptions,',
+          'no skill catalogue in the prompt, and smaller tool results.',
           '',
-          muted(`Auto-compaction fires at ${ctx.services.config.ui.compactAtPercent}% — or force it now with /compact.`),
-        ].join('\n'),
-      };
+          `${accent('More room, in order of how much it costs you:')}`,
+          `  ${c.bold('1.')} A smaller model leaves more VRAM for context.`,
+          muted('     nave pull qwen3:4b  →  roughly 3x the window'),
+          `  ${c.bold('2.')} Halve the KV cache: ${c.bold('nave config set gpu.kvCacheType q4_0')}`,
+          muted(`     about 2x the window (${formatTokens(maxCtx)} ceiling for this model), slight quality cost`),
+          `  ${c.bold('3.')} Close other GPU users — a browser can hold a gigabyte.`,
+        ];
+        out.push(panel('Why the window is small', hints, 'warn'));
+      }
+
+      return { output: out.join('\n') };
     },
   },
 

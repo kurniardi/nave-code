@@ -38,6 +38,15 @@ const MAX_READ_LINES = 1500;
 const MAX_LINE_CHARS = 2000;
 const MAX_FILE_BYTES = 5_000_000;
 
+/**
+ * A read must fit the caller's slice of the context window. On a 10k window
+ * that is roughly 2,200 tokens — about 200 lines of code, not 1,500.
+ */
+function readBudget(ctx: ToolContext): { lines: number; chars: number } {
+  const chars = Math.max(1200, ctx.resultTokens * 3.2);
+  return { lines: Math.max(40, Math.floor(chars / 42)), chars: Math.floor(chars) };
+}
+
 function guard(ctx: ToolContext, p: string): { path: string } | ToolResult {
   const { path, inside } = resolveInProject(ctx.cwd, p);
   if (!inside) {
@@ -83,8 +92,13 @@ export const readTool: Tool = {
     if (raw.includes('\u0000')) return fail(`${p} contains binary data`);
 
     const lines = raw.split(/\r?\n/);
+    const budget = readBudget(ctx);
     const offset = Math.max(1, num(args, 'offset') ?? 1);
-    const limit = Math.min(num(args, 'limit') ?? MAX_READ_LINES, MAX_READ_LINES);
+    const limit = Math.min(
+      num(args, 'limit') ?? budget.lines,
+      budget.lines,
+      MAX_READ_LINES
+    );
     const slice = lines.slice(offset - 1, offset - 1 + limit);
 
     ctx.readFiles.add(g.path);
@@ -197,8 +211,15 @@ export const editTool: Tool = {
     const count = countOccurrences(before, oldStr);
 
     if (count === 0) {
+      // A weak model can burn several steps guessing at whitespace. Show it
+      // the closest region of the real file so the next attempt is informed.
+      const near = nearestRegion(before, oldStr);
       return fail(
-        `old_string was not found in ${p}. The file may use different whitespace or line endings — re-read it and copy the exact text.`
+        `old_string was not found in ${p}.` +
+          (near
+            ? `\n\nThe closest matching part of the file is line ${near.line}:\n\n${near.text}\n\n` +
+              'Copy from this exactly, including indentation and line endings.'
+            : ' Re-read the file and copy the target text exactly, including indentation.')
       );
     }
     if (count > 1 && !replaceAll) {
@@ -353,7 +374,9 @@ export const grepTool: Tool = {
     }
 
     const mode = (str(args, 'output_mode') ?? 'files') as 'files' | 'content' | 'count';
-    const limit = num(args, 'limit') ?? 100;
+    // Match the caller's context slice: ~55 chars per reported line.
+    const roomLines = Math.max(20, Math.floor((ctx.resultTokens * 3.2) / 55));
+    const limit = Math.min(num(args, 'limit') ?? 100, roomLines);
     const ctxLines = num(args, 'context') ?? 0;
     const globRx = str(args, 'glob') ? globToRegex(str(args, 'glob')!) : null;
 
@@ -484,6 +507,53 @@ export function globToRegex(pattern: string): RegExp {
 
 function escapeRx(s: string): string {
   return s.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Best guess at where the model meant to edit: the window of file lines whose
+ * squashed text overlaps most with the squashed old_string.
+ */
+function nearestRegion(
+  file: string,
+  target: string
+): { line: number; text: string } | null {
+  const fileLines = file.split('\n');
+  const targetLines = target.split('\n').filter((l) => l.trim());
+  if (!targetLines.length || !fileLines.length) return null;
+
+  const squash = (s: string): string => s.replace(/\s+/g, ' ').trim().toLowerCase();
+  const needle = squash(targetLines[0]);
+  if (needle.length < 3) return null;
+
+  let bestLine = -1;
+  let bestScore = 0;
+  for (let i = 0; i < fileLines.length; i++) {
+    const score = similarity(needle, squash(fileLines[i]));
+    if (score > bestScore) {
+      bestScore = score;
+      bestLine = i;
+    }
+  }
+  if (bestLine < 0 || bestScore < 0.4) return null;
+
+  const from = Math.max(0, bestLine - 1);
+  const to = Math.min(fileLines.length - 1, bestLine + targetLines.length);
+  const text = fileLines
+    .slice(from, to + 1)
+    .map((l, i) => `${String(from + i + 1).padStart(5)}\t${l}`)
+    .join('\n');
+  return { line: bestLine + 1, text };
+}
+
+/** Cheap token-overlap ratio; good enough to point at the right place. */
+function similarity(a: string, b: string): number {
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  const at = new Set(a.split(' '));
+  const bt = new Set(b.split(' '));
+  let shared = 0;
+  for (const t of at) if (bt.has(t)) shared++;
+  return shared / Math.max(at.size, bt.size);
 }
 
 function countOccurrences(haystack: string, needle: string): number {

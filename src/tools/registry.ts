@@ -1,5 +1,5 @@
 import type { Tool } from './types.ts';
-import type { ToolSpec } from '../providers/types.ts';
+import type { ToolSpec, JsonSchema } from '../providers/types.ts';
 import { readTool, writeTool, editTool, lsTool, globTool, grepTool } from './fs.ts';
 import { bashTool, bashOutputTool } from './bash.ts';
 import { todoTool } from './todo.ts';
@@ -48,6 +48,8 @@ export function selectTools(opts: {
   hasSkills: boolean;
   memoryEnabled: boolean;
   canDelegate: boolean;
+  /** When true, descriptions are trimmed to fit a small context window. */
+  compact?: boolean;
 }): ToolSelection {
   let tools = opts.allow === '*' ? [...ALL_TOOLS] : ALL_TOOLS.filter((t) => opts.allow.includes(t.name));
 
@@ -63,16 +65,43 @@ export function selectTools(opts: {
     tools = tools.filter((t) => !t.advanced || opts.allow !== '*');
   }
 
-  return { tools, specs: tools.map(toSpec) };
+  // On a tight window the schemas are the single biggest fixed cost, and
+  // bash_readonly duplicates what bash already does.
+  if (opts.compact && opts.allow === '*') {
+    tools = tools.filter((t) => t.name !== 'bash_readonly' && t.name !== 'http');
+  }
+
+  return { tools, specs: tools.map((t) => toSpec(t, opts.compact)) };
 }
 
-export function toSpec(tool: Tool): ToolSpec {
+export function toSpec(tool: Tool, compact = false): ToolSpec {
   return {
     type: 'function',
     function: {
       name: tool.name,
-      description: tool.description,
-      parameters: tool.parameters,
+      description: compact ? firstSentence(tool.description, 150) : tool.description,
+      parameters: compact ? compactSchema(tool.parameters) : tool.parameters,
     },
   };
+}
+
+/** Keep the shape and the required fields; shorten the prose. */
+function compactSchema(schema: JsonSchema): JsonSchema {
+  if (!schema.properties) return schema;
+  const properties: Record<string, JsonSchema> = {};
+  for (const [key, prop] of Object.entries(schema.properties)) {
+    properties[key] = {
+      ...prop,
+      description: prop.description ? firstSentence(prop.description, 70) : undefined,
+      ...(prop.properties ? compactSchema(prop) : {}),
+    };
+  }
+  return { ...schema, description: undefined, properties };
+}
+
+function firstSentence(text: string, max: number): string {
+  const flat = text.replace(/\s+/g, ' ').trim();
+  const cut = flat.split(/(?<=\.)\s/)[0] ?? flat;
+  const chosen = cut.length < 25 ? flat : cut;
+  return chosen.length > max ? `${chosen.slice(0, max - 1)}…` : chosen;
 }

@@ -20,6 +20,8 @@ export interface SystemPromptInput {
   isSubAgent: boolean;
   /** Total prompt budget in tokens; sections are dropped to fit. */
   budgetTokens: number;
+  /** Small window: drop the skill catalogue and keep every section terse. */
+  tight?: boolean;
 }
 
 export function buildSystemPrompt(input: SystemPromptInput): {
@@ -56,7 +58,7 @@ export function buildSystemPrompt(input: SystemPromptInput): {
   });
 
   if (!input.isSubAgent && services.config.memory.enabled && services.config.memory.autoLoad) {
-    const mem = services.memory.contextBlock(Math.floor(input.budgetTokens * 0.25));
+    const mem = services.memory.contextBlock(Math.floor(input.budgetTokens * (input.tight ? 0.3 : 0.25)));
     if (mem.text) {
       sections.push({ key: 'memory', priority: 3, text: mem.text });
     }
@@ -76,9 +78,11 @@ export function buildSystemPrompt(input: SystemPromptInput): {
 
   if (services.config.skills.enabled && services.skills.count && tools.some((t) => t.name === 'skill')) {
     const modeCfg = services.config.skills.mode;
+    // A catalogue of 60+ skills costs ~1800 tokens. On a small window that is
+    // most of the room the conversation needs, so the skill tool carries it.
     const inject =
       modeCfg === 'inject' ||
-      (modeCfg === 'auto' && (input.profile?.paramsB ?? 7) >= 7);
+      (modeCfg === 'auto' && !input.tight && (input.profile?.paramsB ?? 7) >= 7);
     if (inject) {
       sections.push({
         key: 'skills',
