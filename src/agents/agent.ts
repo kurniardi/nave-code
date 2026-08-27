@@ -13,6 +13,7 @@ import type { RuntimePlan } from '../gpu/tuning.ts';
 import { estimateTokens } from '../util/tokens.ts';
 import { contextBudget, tokensToChars } from '../core/budget.ts';
 import type { ContextBudget } from '../core/budget.ts';
+import type { Asker } from '../ui/choice.ts';
 
 export interface AgentEvents {
   onText?(chunk: string): void;
@@ -24,6 +25,9 @@ export interface AgentEvents {
   onModelReady?(info: ModelReadyInfo): void;
   onCompact?(before: number, after: number): void;
 }
+
+/** How many times a stalled turn may be prodded before nave gives up. */
+const MAX_NUDGES = 2;
 
 export interface ModelReadyInfo {
   agent: string;
@@ -48,6 +52,8 @@ export interface RunOptions {
   readFiles?: Set<string>;
   /** Sub-agents skip memory injection and the agent catalogue. */
   isSubAgent?: boolean;
+  /** Lets tools ask the user a question; absent when non-interactive. */
+  ask?: Asker;
 }
 
 export interface RunResult {
@@ -74,6 +80,9 @@ export class Agent {
   private isSubAgent: boolean;
   private modelOverride?: string;
   private budget: ContextBudget = contextBudget(8192);
+  private ask?: Asker;
+  /** Rebuilds the system prompt when the permission mode changes mid-turn. */
+  private refreshSystem: (() => void) | null = null;
 
   constructor(opts: RunOptions) {
     this.services = opts.services;
@@ -86,6 +95,7 @@ export class Agent {
     this.readFiles = opts.readFiles ?? new Set();
     this.isSubAgent = opts.isSubAgent ?? false;
     this.modelOverride = opts.modelOverride;
+    this.ask = opts.ask;
   }
 
   async run(userMessage: string | null, signal: AbortSignal): Promise<RunResult> {
@@ -128,14 +138,21 @@ export class Agent {
     const budget = contextBudget(plan.numCtx, services.config.ui.compactAtPercent);
     this.budget = budget;
 
-    const selection = selectTools({
-      allow: this.def.tools,
-      paramsB: profile.paramsB,
-      hasSkills: services.skills.count > 0,
-      memoryEnabled: services.config.memory.enabled,
-      canDelegate: this.depth < services.config.agents.maxDepth && !this.isSubAgent,
-      compact: budget.tight,
-    });
+    // Recomputed whenever the permission mode changes: plan mode withholds
+    // every mutating tool, so approving a plan has to hand them back — within
+    // the same turn, or the model is told to build something it cannot touch.
+    const pickTools = () =>
+      selectTools({
+        allow: this.def.tools,
+        paramsB: profile.paramsB,
+        hasSkills: services.skills.count > 0,
+        memoryEnabled: services.config.memory.enabled,
+        canDelegate: this.depth < services.config.agents.maxDepth && !this.isSubAgent,
+        compact: budget.tight,
+        planMode: this.permissions.currentMode === 'plan',
+        interactive: this.ask !== undefined,
+      });
+    let selection = pickTools();
     const toolMode: 'native' | 'prompted' = profile.supportsTools ? 'native' : 'prompted';
 
     // 4. System prompt, capped so the conversation still has room.
@@ -149,12 +166,29 @@ export class Agent {
       budgetTokens: budget.system,
       tight: budget.tight,
     });
+    const compose = (): string => {
+      const rebuilt = buildSystemPrompt({
+        services,
+        agent: this.def,
+        profile,
+        tools: selection.tools,
+        mode: this.permissions.currentMode,
+        isSubAgent: this.isSubAgent,
+        budgetTokens: budget.system,
+        tight: budget.tight,
+      });
+      return toolMode === 'prompted'
+        ? `${rebuilt.text}\n\n${protocolInstructions(selection.specs)}`
+        : rebuilt.text;
+    };
+
     let systemText = built.text;
     if (toolMode === 'prompted') {
       systemText += `\n\n${protocolInstructions(selection.specs)}`;
     }
     this.session.setSystem(systemText);
     this.session.model = model;
+    this.refreshSystem = () => this.session.setSystem(compose());
 
     if (built.dropped.length) {
       this.events.onNotice?.(
@@ -183,6 +217,7 @@ export class Agent {
     let toolCalls = 0;
     let lastText = '';
     let tps: number | null = null;
+    let nudges = 0;
 
     const options = {
       ...plan.options,
@@ -265,13 +300,46 @@ export class Agent {
 
       if (!calls.length) {
         lastText = assistantText.trim();
+
+        // Small models often narrate the next step instead of taking it —
+        // "I will now edit the file" — and then stop. An unfinished plan is a
+        // reliable, language-independent signal that they are not actually
+        // done, so nudge once or twice rather than ending the turn.
+        const unfinished = this.todos.all.filter((t) => t.status !== 'done');
+        if (unfinished.length && nudges < MAX_NUDGES) {
+          nudges++;
+          this.events.onNotice?.(
+            `the plan still has ${unfinished.length} step(s) open — asking it to continue`
+          );
+          this.session.add({
+            role: 'user',
+            content:
+              `You stopped without calling a tool, but the plan is not finished. Still open:\n` +
+              unfinished.map((t) => `- ${t.content}`).join('\n') +
+              `\n\nDo the next step now by calling the tool that does it. ` +
+              `Do not describe what you are about to do — do it. ` +
+              `If a step turns out to be unnecessary or impossible, mark it done with the todo tool and say why.`,
+          });
+          continue;
+        }
+
         return this.result(lastText, steps, model, promptTokens, completionTokens, toolCalls, 'complete', tps);
       }
 
       if (assistantText.trim()) lastText = assistantText.trim();
       toolCalls += calls.length;
 
+      const modeBefore = this.permissions.currentMode;
       const results = await this.executeCalls(calls, selection.tools, signal);
+      if (this.permissions.currentMode !== modeBefore) {
+        // Approving a plan changes both what the model may do and what it is
+        // told; the tool set and the instructions have to move together.
+        selection = pickTools();
+        this.refreshSystem?.();
+        this.events.onNotice?.(
+          `tools available: ${selection.tools.map((t) => t.name).join(', ')}`
+        );
+      }
       for (const { call, result } of results) {
         this.session.add({
           role: toolMode === 'native' ? 'tool' : 'user',
@@ -362,6 +430,7 @@ export class Agent {
       emit: (line) => this.events.onNotice?.(line),
       readFiles: this.readFiles,
       resultTokens: this.budget.toolResult,
+      ask: this.ask,
       spawnAgent: (req) => this.spawnSubAgent(req, signal),
     };
   }
@@ -380,6 +449,7 @@ export class Agent {
       modelOverride: req.model,
       isSubAgent: true,
       readFiles: new Set(this.readFiles),
+      ask: this.ask,
       events: {
         onNotice: (line) => this.events.onNotice?.(`  ${req.agent}: ${line}`),
         onToolStart: (name, args) => this.events.onToolStart?.(`${req.agent}/${name}`, args),

@@ -202,15 +202,41 @@ anything that is not localhost or a private address — nave stays offline.
 
 ## Permissions
 
-| Mode | Behaviour |
-|---|---|
-| `ask` (default) | prompt before every write, edit and command |
-| `acceptEdits` | file changes are automatic, commands still prompt |
-| `plan` | read-only: investigate and propose, change nothing |
-| `full` | never prompt |
+| Mode | Shown as | Behaviour |
+|---|---|---|
+| `ask` (default) | `›` | prompt before every write, edit and command |
+| `acceptEdits` | `auto ›` | file changes are automatic, commands still prompt |
+| `plan` | `plan ›` | read-only: investigate and propose, change nothing |
+| `full` | `full ›` | never prompt |
+
+**Shift+Tab** cycles between them mid-session, keeping whatever you had typed.
+The prompt always shows the current mode, so it can never be a surprise.
 
 Set per run with `--plan`, `--accept-edits`, `-y`, or during a session with
-`/permissions`. Rules use Claude Code's syntax, so `bash(npm run *)` and
+`/permissions`.
+
+### Plan mode is a workflow, not just a lock
+
+In plan mode nave investigates and then calls `present_plan`, which shows the
+plan and asks:
+
+```
+╭─ plan ready ─────────────────────────────────────────────────╮
+│ 1. Add a farewell function to greet.js, matching the existing style     │
+│ 2. Verify by running the tests                                          │
+│                                                                         │
+│ [y] Approve — build it          edits apply, commands still ask         │
+│ [a] Approve — no more prompts   runs to completion unattended           │
+│ [n] Keep planning               stay read-only and revise               │
+╚══════════════════════════════════════════════════════════════════════╝
+```
+
+Approving switches the mode and hands the mutating tools back **in the same
+turn**, so the work starts immediately with the plan already in context.
+
+One measured caveat: with a 7B model the flow works but the model often
+narrates the first step instead of taking it. nave nudges twice when the todo
+list still has open items, then stops. A stronger model handles it better. Rules use Claude Code's syntax, so `bash(npm run *)` and
 `edit(src/**)` work as you would expect:
 
 ```json
@@ -243,7 +269,7 @@ nave sessions
 
 `/help` `/models` `/model` `/gpu` `/memory` `/agents` `/skills` `/tools`
 `/permissions` `/context` `/compact` `/clear` `/sessions` `/init` `/config`
-`/pull` `/exit`
+`/pull` `/exit` · **Shift+Tab** cycles permission modes
 
 **Flags**
 

@@ -178,9 +178,15 @@ function toolRules(tools: Tool[], mode: PermissionMode): string {
 
   if (mode === 'plan') {
     lines.push(
-      '- **Plan mode is on: nothing you do may change the machine.** No writes, no edits, no commands. ' +
-        'Investigate and then present a plan for the user to approve.'
+      '- **Plan mode is on: nothing you do may change the machine.** No writes, no edits, no commands.'
     );
+    if (tools.some((t) => t.name === 'present_plan')) {
+      lines.push(
+        '- Read enough of the codebase to be specific, then call **present_plan** with numbered steps, ' +
+          'the files each one touches, and how to verify it. If the user approves, plan mode ends and you ' +
+          'build it immediately. Do not ask for approval in prose — the tool is how you ask.'
+      );
+    }
   } else if (mode === 'ask') {
     lines.push(
       '- Writes, edits and commands need the user\'s approval. If one is declined, do not retry it — ask what they want instead.'

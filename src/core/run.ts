@@ -5,6 +5,7 @@ import type { Services } from './services.ts';
 import type { Session } from '../session/session.ts';
 import type { Permissions } from '../session/permissions.ts';
 import { TodoList } from '../tools/todo.ts';
+import type { Asker } from '../ui/choice.ts';
 import { Spinner, StreamWriter, toolLine, resultLine, noticeLine } from '../ui/render.ts';
 import { c, accent, muted } from '../util/colors.ts';
 import { formatTokens } from '../util/tokens.ts';
@@ -23,6 +24,8 @@ export interface TurnDeps {
   verbose?: boolean;
   /** Show the model/plan line on the first turn. */
   announceModel?: boolean;
+  /** Lets tools ask the user a question; absent in headless runs. */
+  ask?: Asker;
 }
 
 /**
@@ -78,6 +81,7 @@ export async function executeTurn(
     todos: deps.todos,
     readFiles: deps.readFiles,
     modelOverride: deps.modelOverride,
+    ask: deps.ask,
     events: {
       onModelReady: (info) => {
         if (deps.quiet || !deps.announceModel) return;

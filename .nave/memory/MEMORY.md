@@ -21,6 +21,7 @@ Loaded at the start of every nave session — keep it short and true.
 
 - [Every context limit scales with the window](budgets-scale-with-the-window.md) — Fixed token/char constants overflow a 10k window before the first message; src/core/budget.ts derives every limit from numCtx.
 - [The launcher must not run a stale dist](launcher-prefers-fresh-source.md) — bin/nave.mjs compares dist mtime against the newest src/*.ts, or an old build silently shadows your edits.
+- [A permission-mode change must rebuild the tool set, not just the prompt](mode-changes-must-refresh-tools.md) — Plan mode withholds mutating tools; approving a plan has to hand them back mid-turn or the model narrates work it cannot do.
 - [Multi-line paste has to be intercepted before readline](paste-must-bypass-readline.md) — readline treats every pasted newline as Enter; PasteFilter strips bracketed-paste markers and holds the text aside.
 - [Local models print tool calls as text — recover them](recover-text-tool-calls.md) — Even tool-capable models sometimes emit a JSON call in the reply body and then claim it ran; Agent.run parses those back out.
 - [Send think:false explicitly to thinking models](thinking-must-be-explicit.md) — qwen3-class models reason by default; omitting the flag spends thousands of invisible tokens out of a small window.

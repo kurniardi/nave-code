@@ -2,6 +2,8 @@ import { createInterface } from 'node:readline/promises';
 import { c, accent, muted } from '../util/colors.ts';
 import { suspendSpinner, panel } from './render.ts';
 import { PasteFilter, expandPastes, pasteMarker, PASTE_ON, PASTE_OFF } from './paste.ts';
+import type { ChoicePrompt } from './choice.ts';
+export type { Choice, ChoicePrompt } from './choice.ts';
 
 /**
  * Single owner of stdin, one prompt at a time.
@@ -17,26 +19,19 @@ import { PasteFilter, expandPastes, pasteMarker, PASTE_ON, PASTE_OFF } from './p
  * a single raw keypress. History is carried across by hand.
  */
 
-export interface Choice<T> {
-  key: string;
-  label: string;
-  hint?: string;
-  value: T;
-}
-
-export interface ChoicePrompt<T> {
-  question: string;
-  detail?: string;
-  tone?: 'normal' | 'danger';
-  choices: Array<Choice<T>>;
-  /** Returned on Enter, EOF or Ctrl+C. */
-  fallback: T;
-}
-
 export type LineResult =
   | { kind: 'line'; value: string }
   | { kind: 'interrupt' }
-  | { kind: 'eof' };
+  | { kind: 'eof' }
+  /** Shift+Tab was pressed; re-prompt with whatever was already typed. */
+  | { kind: 'cycle'; partial: string };
+
+export interface LineOptions {
+  /** Text to put back in the buffer, e.g. after a mode change. */
+  prefill?: string;
+  /** Enables Shift+Tab. Called before the prompt is redrawn. */
+  onCycleMode?: () => void;
+}
 
 /**
  * Non-TTY stdin, read once and buffered.
@@ -102,7 +97,7 @@ export class InputController {
   private closed = false;
 
   /** One line of input, distinguishing Ctrl+C from Ctrl+D. */
-  async line(promptText: string): Promise<LineResult> {
+  async line(promptText: string, opts: LineOptions = {}): Promise<LineResult> {
     if (this.closed) return { kind: 'eof' };
 
     if (!process.stdin.isTTY) {
@@ -120,6 +115,8 @@ export class InputController {
     // Multi-line pastes are pulled out of the stream and held here, so
     // readline never sees the newlines that would submit each line on its own.
     const pastes: string[] = [];
+    let cycled = false;
+    let carried = '';
     const filter = new PasteFilter({
       onPaste: (text) => {
         if (!text.includes('\n')) {
@@ -130,6 +127,16 @@ export class InputController {
         pastes.push(text);
         rl.write(pasteMarker(pastes.length, lines));
       },
+      onCycleMode: opts.onCycleMode
+        ? () => {
+            // Close the prompt and let the caller redraw it with the new mode,
+            // carrying whatever was half-typed back into the buffer.
+            cycled = true;
+            carried = String((rl as unknown as { line?: string }).line ?? '');
+            opts.onCycleMode!();
+            rl.close();
+          }
+        : undefined,
     });
     const rl = createInterface({
       input: filter,
@@ -143,6 +150,7 @@ export class InputController {
     // Only now can data reach onPaste, which needs `rl` to exist.
     process.stdin.pipe(filter);
     process.stdout.write(PASTE_ON);
+    if (opts.prefill) rl.write(opts.prefill);
 
     let interrupted = false;
     rl.on('SIGINT', () => {
@@ -157,6 +165,7 @@ export class InputController {
     try {
       const answer = await Promise.race([rl.question(promptText), closedEarly]);
       if (answer === null) {
+        if (cycled) return { kind: 'cycle', partial: carried };
         if (interrupted) {
           process.stdout.write('\n');
           return { kind: 'interrupt' };
@@ -283,25 +292,34 @@ export class InputController {
 
 function renderChoice<T>(spec: ChoicePrompt<T>): string {
   const danger = spec.tone === 'danger';
+  const isPlan = spec.tone === 'plan';
   const body: string[] = [c.bold(spec.question)];
 
   if (spec.detail) {
-    for (const d of spec.detail.split('\n').slice(0, 4)) body.push(muted(d));
+    // A plan is the whole point of its prompt, so it is shown in full.
+    const lines = spec.detail.split('\n');
+    if (isPlan) {
+      body.push('');
+      for (const d of lines) body.push(d);
+    } else {
+      for (const d of lines.slice(0, 4)) body.push(muted(d));
+    }
   }
   body.push('');
 
   const keyWidth = Math.max(...spec.choices.map((ch) => ch.label.length));
   for (const ch of spec.choices) {
-    const key = c.bold(danger ? c.red(`[${ch.key}]`) : accent(`[${ch.key}]`));
+    const paint = danger ? c.red : isPlan ? c.brightBlue : accent;
+    const key = c.bold(paint(`[${ch.key}]`));
     const label = ch.label.padEnd(keyWidth);
     const hint = ch.hint ? muted(`   ${ch.hint}`) : '';
     body.push(`${key} ${label}${hint}`);
   }
 
   const card = panel(
-    danger ? 'needs approval · destructive' : 'needs approval',
+    danger ? 'needs approval · destructive' : isPlan ? 'plan ready' : 'needs approval',
     body,
-    danger ? 'bad' : 'accent'
+    danger ? 'bad' : isPlan ? 'plan' : 'accent'
   );
   const how = process.stdin.isTTY
     ? `  ${muted('press')} ${c.bold('y')}${muted(' / ')}${c.bold('a')}${muted(' / ')}${c.bold('n')}`

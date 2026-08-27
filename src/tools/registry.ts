@@ -7,6 +7,7 @@ import { memoryTool } from './memory.ts';
 import { skillTool } from './skill.ts';
 import { taskTool } from './task.ts';
 import { httpTool } from './http.ts';
+import { presentPlanTool } from './plan.ts';
 
 export const ALL_TOOLS: Tool[] = [
   readTool,
@@ -22,6 +23,7 @@ export const ALL_TOOLS: Tool[] = [
   skillTool,
   taskTool,
   httpTool,
+  presentPlanTool,
 ];
 
 const BY_NAME = new Map(ALL_TOOLS.map((t) => [t.name, t]));
@@ -50,9 +52,18 @@ export function selectTools(opts: {
   canDelegate: boolean;
   /** When true, descriptions are trimmed to fit a small context window. */
   compact?: boolean;
+  /** Plan mode offers present_plan and withholds everything that mutates. */
+  planMode?: boolean;
+  /** No one to answer questions, so plan approval is impossible. */
+  interactive?: boolean;
 }): ToolSelection {
   let tools = opts.allow === '*' ? [...ALL_TOOLS] : ALL_TOOLS.filter((t) => opts.allow.includes(t.name));
 
+  // present_plan exists only to leave plan mode, and needs someone to ask.
+  if (!opts.planMode || opts.interactive === false) {
+    tools = tools.filter((t) => t.name !== 'present_plan');
+  }
+  if (opts.planMode) tools = tools.filter((t) => t.readOnly || t.name === 'present_plan');
   if (!opts.hasSkills) tools = tools.filter((t) => t.name !== 'skill');
   if (!opts.memoryEnabled) tools = tools.filter((t) => t.name !== 'memory');
   if (!opts.canDelegate) tools = tools.filter((t) => t.name !== 'task');

@@ -20,9 +20,13 @@ export const PASTE_OFF = '\u001b[?2004l';
 
 const START = '\u001b[200~';
 const END = '\u001b[201~';
+/** Shift+Tab: the conventional 'change mode' key in a coding REPL. */
+const SHIFT_TAB = '\u001b[Z';
 
 export interface PasteFilterOptions {
   onPaste: (text: string) => void;
+  /** Shift+Tab, swallowed rather than passed to readline. */
+  onCycleMode?: () => void;
 }
 
 export class PasteFilter extends Transform {
@@ -32,10 +36,12 @@ export class PasteFilter extends Transform {
   private inPaste = false;
   private pasted = '';
   private onPaste: (text: string) => void;
+  private onCycleMode?: () => void;
 
   constructor(opts: PasteFilterOptions) {
     super();
     this.onPaste = opts.onPaste;
+    this.onCycleMode = opts.onCycleMode;
   }
 
   setRawMode(mode: boolean): this {
@@ -96,6 +102,12 @@ export class PasteFilter extends Transform {
    * which is a paste from a terminal without bracketed-paste support.
    */
   private forward(text: string): void {
+    if (this.onCycleMode && text.includes(SHIFT_TAB)) {
+      const rest = text.split(SHIFT_TAB).join('');
+      this.onCycleMode();
+      if (!rest) return;
+      text = rest;
+    }
     const normalised = text.replace(/\r\n/g, '\n');
     const firstBreak = normalised.search(/[\n\r]/);
     const isBlock =

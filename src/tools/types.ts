@@ -1,6 +1,7 @@
 import type { Services } from '../core/services.ts';
 import type { JsonSchema } from '../providers/types.ts';
 import type { Permissions } from '../session/permissions.ts';
+import type { Asker } from '../ui/choice.ts';
 import type { TodoList } from './todo.ts';
 
 export interface ToolResult {
@@ -34,6 +35,8 @@ export interface ToolContext {
   readFiles: Set<string>;
   /** How much a single tool result may return, in tokens. */
   resultTokens: number;
+  /** Ask the user a question. Absent in non-interactive runs. */
+  ask?: Asker;
 }
 
 export interface Tool {

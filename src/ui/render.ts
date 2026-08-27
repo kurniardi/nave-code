@@ -175,7 +175,7 @@ export function wordmark(subtitle?: string): string {
   return lines.join('\n');
 }
 
-export type Tone = 'accent' | 'ok' | 'warn' | 'bad' | 'plain';
+export type Tone = 'accent' | 'ok' | 'warn' | 'bad' | 'plain' | 'plan';
 
 const TONE: Record<Tone, (s: string) => string> = {
   accent: (s) => accent(s),
@@ -183,6 +183,7 @@ const TONE: Record<Tone, (s: string) => string> = {
   warn: (s) => c.yellow(s),
   bad: (s) => c.red(s),
   plain: (s) => muted(s),
+  plan: (s) => c.brightBlue(s),
 };
 
 /**

@@ -6,6 +6,7 @@ import type { Services } from '../core/services.ts';
 import { Session } from '../session/session.ts';
 import { Permissions } from '../session/permissions.ts';
 import type { PermissionRequest } from '../session/permissions.ts';
+import type { PermissionMode } from '../config/config.ts';
 import { TodoList } from '../tools/todo.ts';
 import { executeTurn, summariseTurn } from '../core/run.ts';
 import { findCommand, customCommands, expandCustomCommand } from '../commands/slash.ts';
@@ -48,13 +49,17 @@ export async function runRepl(opts: ReplOptions): Promise<number> {
   for (const w of startupWarnings(services)) process.stdout.write(w + '\n');
   process.stdout.write(
     '\n' +
-      muted(`  ${c.bold('/help')} for commands   ${c.bold('Ctrl+C')} interrupt   ${c.bold('Ctrl+D')} exit`) +
+      muted(
+        `  ${c.bold('/help')} commands   ${c.bold('shift+tab')} change mode   ` +
+          `${c.bold('Ctrl+C')} interrupt   ${c.bold('Ctrl+D')} exit`
+      ) +
       '\n\n'
   );
 
   let pending = opts.initialPrompt ?? null;
   let announceModel = true;
   let emptyInterrupts = 0;
+  let carryOver = '';
 
   for (;;) {
     let text: string;
@@ -64,8 +69,21 @@ export async function runRepl(opts: ReplOptions): Promise<number> {
       pending = null;
       process.stdout.write(`${accent('›')} ${text}\n`);
     } else {
-      const result = await input.line(`${accent('›')} `);
+      const prefill = carryOver;
+      carryOver = '';
+      const result = await input.line(promptFor(permissions), {
+        prefill,
+        onCycleMode: () => {
+          permissions.setMode(nextMode(permissions.currentMode));
+          process.stdout.write(`\n${modeBanner(permissions)}\n`);
+        },
+      });
       if (result.kind === 'eof') break;
+      if (result.kind === 'cycle') {
+        // Shift+Tab changed the mode; redraw the prompt with the typing intact.
+        carryOver = result.partial;
+        continue;
+      }
       if (result.kind === 'interrupt') {
         emptyInterrupts++;
         if (emptyInterrupts >= 2) break;
@@ -125,6 +143,7 @@ export async function runRepl(opts: ReplOptions): Promise<number> {
           agentName: opts.agentName,
           modelOverride: opts.modelOverride,
           announceModel,
+          ask: (spec) => input.choice(spec),
         },
         controller.signal
       );
@@ -264,4 +283,48 @@ function startupWarnings(services: Services): string[] {
     );
   }
   return out;
+}
+
+/** Order the modes cycle in: least power to most, then back. */
+const MODE_ORDER: PermissionMode[] = ['ask', 'acceptEdits', 'plan', 'full'];
+
+export function nextMode(current: PermissionMode): PermissionMode {
+  const i = MODE_ORDER.indexOf(current);
+  return MODE_ORDER[(i + 1) % MODE_ORDER.length];
+}
+
+const MODE_LABEL: Record<PermissionMode, string> = {
+  ask: 'ask',
+  acceptEdits: 'auto',
+  plan: 'plan',
+  full: 'full',
+};
+
+const MODE_BLURB: Record<PermissionMode, string> = {
+  ask: 'asks before every write, edit and command',
+  acceptEdits: 'edits apply on their own, commands still ask',
+  plan: 'read-only — investigate and propose, change nothing',
+  full: 'no prompts at all',
+};
+
+function paintMode(mode: PermissionMode, text: string): string {
+  if (mode === 'plan') return c.brightBlue(text);
+  if (mode === 'acceptEdits') return c.yellow(text);
+  if (mode === 'full') return c.red(text);
+  return accent(text);
+}
+
+/** The prompt carries the mode, so it can never be a surprise. */
+function promptFor(permissions: Permissions): string {
+  const mode = permissions.currentMode;
+  if (mode === 'ask') return `${accent('›')} `;
+  return `${paintMode(mode, MODE_LABEL[mode])} ${paintMode(mode, '›')} `;
+}
+
+function modeBanner(permissions: Permissions): string {
+  const mode = permissions.currentMode;
+  return (
+    `  ${paintMode(mode, '●')} ${c.bold(MODE_LABEL[mode])} ${muted('mode')} ` +
+    muted(`— ${MODE_BLURB[mode]}`)
+  );
 }
