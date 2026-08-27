@@ -23,4 +23,5 @@ Loaded at the start of every nave session — keep it short and true.
 - [The launcher must not run a stale dist](launcher-prefers-fresh-source.md) — bin/nave.mjs compares dist mtime against the newest src/*.ts, or an old build silently shadows your edits.
 - [Multi-line paste has to be intercepted before readline](paste-must-bypass-readline.md) — readline treats every pasted newline as Enter; PasteFilter strips bracketed-paste markers and holds the text aside.
 - [Local models print tool calls as text — recover them](recover-text-tool-calls.md) — Even tool-capable models sometimes emit a JSON call in the reply body and then claim it ran; Agent.run parses those back out.
+- [Send think:false explicitly to thinking models](thinking-must-be-explicit.md) — qwen3-class models reason by default; omitting the flag spends thousands of invisible tokens out of a small window.
 - [The VRAM budget must add back the resident model](vram-budget-counts-resident-model.md) — nvidia-smi reports an already-loaded model as used VRAM; without adding it back, every run after the first needlessly offloads layers to CPU.

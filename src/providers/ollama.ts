@@ -183,7 +183,9 @@ export class OllamaClient {
       keep_alive: req.keepAlive ?? this.keepAlive,
     };
     if (req.tools?.length) body.tools = req.tools;
-    if (req.think) body.think = true;
+    // false must be sent, not dropped: it is how a thinking-capable model is
+    // told to skip reasoning it would otherwise produce by default.
+    if (req.think !== undefined) body.think = req.think;
     if (req.format) body.format = req.format;
     if (req.options) body.options = req.options;
 

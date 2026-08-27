@@ -208,7 +208,12 @@ export class Agent {
             model,
             messages: this.session.messages,
             tools: toolMode === 'native' ? selection.specs : undefined,
-            think: profile.supportsThinking && services.config.ui.showThinking ? true : undefined,
+            // Be explicit. Omitting this lets the model decide, and qwen3-class
+            // models think by default — thousands of invisible tokens out of a
+            // window this small, with nothing shown for them.
+            think: profile.supportsThinking
+              ? services.config.ui.showThinking
+              : undefined,
             options,
             signal,
           },
