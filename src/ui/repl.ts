@@ -1,7 +1,6 @@
-import { createInterface } from 'node:readline/promises';
-import type { Interface } from 'node:readline/promises';
 import { c, accent, muted } from '../util/colors.ts';
-import { banner, errorBox } from './render.ts';
+import { wordmark, panel, errorBox, block } from './render.ts';
+import { InputController } from './input.ts';
 import { formatMb } from '../gpu/detect.ts';
 import type { Services } from '../core/services.ts';
 import { Session } from '../session/session.ts';
@@ -9,11 +8,7 @@ import { Permissions } from '../session/permissions.ts';
 import type { PermissionRequest } from '../session/permissions.ts';
 import { TodoList } from '../tools/todo.ts';
 import { executeTurn, summariseTurn } from '../core/run.ts';
-import {
-  findCommand,
-  customCommands,
-  expandCustomCommand,
-} from '../commands/slash.ts';
+import { findCommand, customCommands, expandCustomCommand } from '../commands/slash.ts';
 import type { SlashContext } from '../commands/slash.ts';
 
 export interface ReplOptions {
@@ -24,20 +19,18 @@ export interface ReplOptions {
   initialPrompt?: string;
 }
 
+type Answer = 'once' | 'always' | 'no';
+
 export async function runRepl(opts: ReplOptions): Promise<number> {
   const { services } = opts;
   let session = opts.session;
   const todos = new TodoList();
   const readFiles = new Set<string>();
+  const input = new InputController();
 
-  const rl = createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    terminal: process.stdin.isTTY === true,
-    historySize: 200,
-  });
-
-  const permissions = new Permissions(services.config, (req) => askPermission(rl, req));
+  const permissions = new Permissions(services.config, (req) =>
+    askPermission(input, req)
+  );
 
   const slashCtx: SlashContext = {
     services,
@@ -50,35 +43,43 @@ export async function runRepl(opts: ReplOptions): Promise<number> {
     lastStats: null,
   };
 
-  process.stdout.write(banner(startupLine(services)));
-  const warning = startupWarning(services);
-  if (warning) process.stdout.write(warning + '\n');
-  process.stdout.write(muted('  /help for commands · Ctrl+C to interrupt · Ctrl+D to exit\n\n'));
+  process.stdout.write(wordmark());
+  process.stdout.write(sessionHeader(services, permissions) + '\n');
+  for (const w of startupWarnings(services)) process.stdout.write(w + '\n');
+  process.stdout.write(
+    '\n' +
+      muted(`  ${c.bold('/help')} for commands   ${c.bold('Ctrl+C')} interrupt   ${c.bold('Ctrl+D')} exit`) +
+      '\n\n'
+  );
 
   let pending = opts.initialPrompt ?? null;
   let announceModel = true;
-  let interrupts = 0;
+  let emptyInterrupts = 0;
 
   for (;;) {
-    let input: string;
+    let text: string;
+
     if (pending !== null) {
-      input = pending;
+      text = pending;
       pending = null;
-      process.stdout.write(`${accent('›')} ${input}\n`);
+      process.stdout.write(`${accent('›')} ${text}\n`);
     } else {
-      try {
-        input = (await rl.question(`${accent('›')} `)).trim();
-      } catch {
-        break; // Ctrl+D
+      const result = await input.line(`${accent('›')} `);
+      if (result.kind === 'eof') break;
+      if (result.kind === 'interrupt') {
+        emptyInterrupts++;
+        if (emptyInterrupts >= 2) break;
+        process.stdout.write(muted('  (Ctrl+C again to exit, or Ctrl+D)\n'));
+        continue;
       }
+      text = result.value.trim();
     }
 
-    if (!input) continue;
-    interrupts = 0;
+    if (!text) continue;
+    emptyInterrupts = 0;
 
-    // Slash commands.
-    if (input.startsWith('/')) {
-      const [rawName, ...rest] = input.slice(1).split(/\s+/);
+    if (text.startsWith('/')) {
+      const [rawName, ...rest] = text.slice(1).split(/\s+/);
       const argText = rest.join(' ');
 
       const builtin = findCommand(rawName);
@@ -101,23 +102,20 @@ export async function runRepl(opts: ReplOptions): Promise<number> {
       }
 
       process.stdout.write(
-        `${c.red('Unknown command')} ${c.bold('/' + rawName)}. ${muted('Try /help.')}\n\n`
+        `  ${c.red('✗')} unknown command ${c.bold('/' + rawName)} ${muted('— /help lists them')}\n\n`
       );
       continue;
     }
 
-    // A model turn.
+    // A model turn. stdin is unowned while this runs, so Ctrl+C reaches us as
+    // a process signal rather than through a readline nobody is reading.
     const controller = new AbortController();
-    const onSigint = () => {
-      interrupts++;
-      controller.abort();
-    };
-    rl.on('SIGINT', onSigint);
-    rl.pause();
+    const onSigint = () => controller.abort();
+    process.on('SIGINT', onSigint);
 
     try {
       const result = await executeTurn(
-        input,
+        text,
         {
           services,
           session,
@@ -148,72 +146,122 @@ export async function runRepl(opts: ReplOptions): Promise<number> {
     } catch (err) {
       process.stdout.write(errorBox('Unexpected error', String((err as Error).message)) + '\n');
     } finally {
-      rl.off('SIGINT', onSigint);
-      rl.resume();
+      process.off('SIGINT', onSigint);
     }
   }
 
-  rl.close();
-  process.stdout.write(muted('\nbye\n'));
+  input.close();
+  process.stdout.write(muted('\n  bye\n\n'));
   return 0;
 }
 
-async function askPermission(rl: Interface, req: PermissionRequest): Promise<'once' | 'always' | 'no'> {
-  const label = req.destructive ? c.bgRed(c.bold(' destructive ')) : accent('permission');
-  process.stdout.write(`\n${label} ${c.bold(req.description)}\n`);
-  if (req.target && req.target !== req.description) {
-    process.stdout.write(muted(`  ${req.target}\n`));
-  }
-  process.stdout.write(
-    muted(`  [${c.bold('y')}] yes   [${c.bold('a')}] yes, and don't ask again for this   [${c.bold('n')}] no\n`)
-  );
-
-  for (;;) {
-    let answer: string;
-    try {
-      answer = (await rl.question(`  ${accent('?')} `)).trim().toLowerCase();
-    } catch {
-      return 'no';
-    }
-    if (answer === 'y' || answer === 'yes' || answer === '') return 'once';
-    if (answer === 'a' || answer === 'always') return 'always';
-    if (answer === 'n' || answer === 'no') return 'no';
-    process.stdout.write(muted('  answer y, a or n\n'));
-  }
+async function askPermission(
+  input: InputController,
+  req: PermissionRequest
+): Promise<Answer> {
+  return input.choice<Answer>({
+    question: req.description,
+    detail: req.target && req.target !== req.description ? req.target : undefined,
+    tone: req.destructive ? 'danger' : 'normal',
+    choices: [
+      { key: 'y', label: 'Yes', value: 'once' },
+      {
+        key: 'a',
+        label: 'Yes, and stop asking',
+        hint: forWhat(req),
+        value: 'always',
+      },
+      { key: 'n', label: 'No', hint: 'tell nave what to do instead', value: 'no' },
+    ],
+    fallback: 'no',
+  });
 }
 
-function startupLine(services: Services): string {
-  const gpu = services.gpu.gpus[0];
+function forWhat(req: PermissionRequest): string {
+  if (req.tool === 'bash' && req.target) {
+    return `for ${req.target.trim().split(/\s+/)[0]} commands`;
+  }
+  return `for ${req.tool}`;
+}
+
+function sessionHeader(services: Services, permissions: Permissions): string {
   const pick = services.router.ready ? services.router.pick('orchestrator') : null;
-  const bits = [services.cwd];
-  if (pick) bits.push(pick.model);
-  if (gpu) bits.push(`${gpu.name} ${formatMb(gpu.totalMb)}`);
+  const gpu = services.gpu.gpus[0];
   const memories = services.memory.list().length;
-  if (memories) bits.push(`${memories} memories`);
-  if (services.skills.count) bits.push(`${services.skills.count} skills`);
-  return bits.join('  ·  ');
-}
 
-function startupWarning(services: Services): string | null {
-  if (!services.router.ready) return null;
-  if (!services.router.models.length) {
-    return errorBox(
-      'No models installed',
-      'The Ollama server is reachable but has no models.',
-      'Run /pull to see recommendations sized to your GPU.'
+  const rows: string[] = [];
+  rows.push(`${muted('project')}  ${c.bold(services.cwd)}`);
+
+  if (pick) {
+    const plan = services.router.plan(pick.profile);
+    const fit = plan.fitsFully ? c.green('all on GPU') : c.yellow(`${plan.numGpu ?? '?'} layers on GPU`);
+    rows.push(
+      `${muted('model  ')}  ${c.bold(pick.model)} ${muted(`· ${Math.round(plan.numCtx / 1024)}k context ·`)} ${fit}`
     );
   }
+  if (gpu) {
+    rows.push(`${muted('gpu    ')}  ${gpu.name} ${muted(`· ${formatMb(gpu.totalMb)}`)}`);
+  }
+
+  const context: string[] = [];
+  context.push(memories ? `${c.bold(String(memories))} memories` : muted('no memories yet'));
+  if (services.skills.count) context.push(`${c.bold(String(services.skills.count))} skills`);
+  context.push(`${c.bold(permissions.currentMode)} permissions`);
+  rows.push(`${muted('context')}  ${context.join(muted('  ·  '))}`);
+
+  return block(rows, 'accent');
+}
+
+function startupWarnings(services: Services): string[] {
+  if (!services.router.ready) return [];
+  const out: string[] = [];
+
+  if (!services.router.models.length) {
+    return [
+      panel(
+        'No models installed',
+        [
+          'The Ollama server is running but has nothing to run.',
+          '',
+          `${accent('→')} ${c.bold('/pull')} shows models sized to your GPU`,
+        ],
+        'warn'
+      ),
+    ];
+  }
+
   const pick = services.router.pick('orchestrator');
-  if (pick && !pick.profile.supportsTools) {
-    return `  ${c.yellow('⚠')} ${muted(
-      `${pick.model} has no native tool calling — nave will use the prompted fallback, which is slower and less reliable. /models shows better options.`
-    )}`;
+  if (!pick) return out;
+
+  if (!pick.profile.supportsTools) {
+    out.push(
+      panel(
+        'Limited model',
+        [
+          `${c.bold(pick.model)} has no native tool calling, so nave falls back to a text protocol.`,
+          'It works, but it is slower and less reliable.',
+          '',
+          `${accent('→')} ${c.bold('/models')} shows which of yours do support tools`,
+        ],
+        'warn'
+      )
+    );
   }
-  const plan = pick ? services.router.plan(pick.profile) : null;
-  if (plan && !plan.fitsFully) {
-    return `  ${c.yellow('⚠')} ${muted(
-      `${pick!.model} does not fit in VRAM and will partly run on CPU. /gpu explains why.`
-    )}`;
+
+  const plan = services.router.plan(pick.profile);
+  if (!plan.fitsFully) {
+    out.push(
+      panel(
+        'Running partly on CPU',
+        [
+          `${c.bold(pick.model)} does not fit in available VRAM, so some layers run on the CPU.`,
+          'Expect a few tokens per second instead of tens.',
+          '',
+          `${accent('→')} ${c.bold('/gpu')} shows the arithmetic and what would fit`,
+        ],
+        'warn'
+      )
+    );
   }
-  return null;
+  return out;
 }

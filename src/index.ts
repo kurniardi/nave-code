@@ -1,9 +1,9 @@
 import { existsSync, writeFileSync, readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, resolve, basename } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { PRODUCT, VERSION } from './version.ts';
 import { c, accent, muted, setColor } from './util/colors.ts';
-import { banner, heading, table, errorBox } from './ui/render.ts';
+import { banner, heading, table, errorBox, wordmark, panel, block, check, warnLine, crossLine, bullet } from './ui/render.ts';
 import { boot } from './core/services.ts';
 import type { Services } from './core/services.ts';
 import { runRepl } from './ui/repl.ts';
@@ -172,37 +172,78 @@ async function cmdViaSlash(services: Services, cli: Cli): Promise<number> {
 
 function cmdInit(services: Services): number {
   const created = writeProjectScaffold(services.cwd);
-  process.stdout.write(banner(services.cwd));
-  if (created.length) {
-    process.stdout.write(`${accent('✓')} created:\n`);
-    for (const f of created) process.stdout.write(muted(`    ${f}\n`));
-  } else {
-    process.stdout.write(muted('  already set up — nothing to create\n'));
+
+  process.stdout.write(wordmark(`setting up ${basename(services.cwd)}`));
+
+  const files: Array<[string, string]> = [
+    ['NAVE.md', 'standing brief — what this project is, how to build it, its conventions'],
+    ['.nave/memory/', 'durable notes that survive between sessions'],
+    ['.nave/agents/', 'your own sub-agents (optional)'],
+    ['.gitignore', 'transcripts excluded; memory kept'],
+  ];
+
+  const rows: string[] = [];
+  for (const [name, why] of files) {
+    const isNew = created.some((f) => f.startsWith(name.replace(/\/$/, '')));
+    const mark = isNew ? c.green('+') : muted('·');
+    const label = isNew ? c.bold(name) : muted(name);
+    const state = isNew ? '' : muted(' already there');
+    rows.push(`${mark} ${label}${state}`);
+    rows.push(`  ${muted(why)}`);
   }
+
+  process.stdout.write(block(rows, created.length ? 'ok' : 'plain'));
+  process.stdout.write('\n');
+
   process.stdout.write(
-    [
+    panel('Commit these', [
+      `${c.bold('NAVE.md')} and ${c.bold('.nave/memory/')} belong in version control.`,
+      'They are how everyone on this project — and every future nave session —',
+      'starts from the same understanding.',
       '',
-      `  ${muted('Next:')} run ${c.bold('nave')} in this directory and say:`,
-      `    ${accent('"study this project and fill in NAVE.md and your memory"')}`,
-      '',
-    ].join('\n')
+      `${muted('Transcripts in .nave/sessions/ are gitignored. They are noise.')}`,
+    ])
   );
+
+  const memories = services.memory.list().length;
+  process.stdout.write(
+    panel(
+      'What now',
+      memories
+        ? [
+            `This project already has ${c.bold(String(memories))} memories.`,
+            '',
+            `${accent('→')} ${c.bold('nave memory')}   see what nave knows`,
+            `${accent('→')} ${c.bold('nave')}          start working`,
+          ]
+        : [
+            'Let nave read the project and write the first draft of both files:',
+            '',
+            `  ${c.bold('nave')}`,
+            `  ${accent('› study this project and fill in NAVE.md and your memory')}`,
+            '',
+            `${muted('Or just start working — nave records what it learns as it goes.')}`,
+          ],
+      'accent'
+    )
+  );
+
   return 0;
 }
 
 async function cmdDoctor(services: Services): Promise<number> {
-  const out: string[] = [banner('environment check')];
+  const out: string[] = [wordmark('checking this machine')];
   let problems = 0;
 
   // Ollama server.
   const health = await services.client.health();
   out.push(heading('Ollama'));
   if (health.ok) {
-    out.push(`  ${c.green('✓')} server ${c.bold(health.version ?? '')} at ${services.client.host}`);
+    out.push(check(`Ollama ${c.bold(health.version ?? '')}`, `at ${services.client.host}`));
   } else {
     problems++;
     out.push(
-      `  ${c.red('✗')} cannot reach ${services.client.host}`,
+      crossLine(`cannot reach ${services.client.host}`),
       muted(`    ${health.error ?? ''}`),
       `    ${accent('→')} start it with ${c.bold('ollama serve')}`
     );
@@ -214,7 +255,7 @@ async function cmdDoctor(services: Services): Promise<number> {
   out.push(heading('Models'));
   if (!services.router.models.length) {
     problems++;
-    out.push(`  ${c.yellow('!')} no models installed`);
+    out.push(warnLine('no models installed'));
     const recs = recommendedPulls(services.gpu.totalVramMb || 4000);
     out.push(muted('    sized for your hardware:'));
     for (const r of recs) {
@@ -222,18 +263,21 @@ async function cmdDoctor(services: Services): Promise<number> {
     }
   } else {
     const withTools = services.router.models.filter((m) => m.supportsTools);
-    out.push(`  ${c.green('✓')} ${services.router.models.length} installed, ${withTools.length} with native tool calling`);
+    out.push(check(
+      `${services.router.models.length} model${services.router.models.length === 1 ? '' : 's'} installed`,
+      `${withTools.length} with native tool calling`
+    ));
     if (!withTools.length) {
       problems++;
       out.push(
-        `  ${c.yellow('!')} none support tool calling — nave will fall back to a text protocol`,
+        warnLine('none support tool calling — nave falls back to a text protocol'),
         muted('    a tool-capable model (qwen3, qwen2.5-coder, llama3.1, mistral) is strongly recommended')
       );
     }
     const fits = services.router.models.filter((m) => services.router.plan(m).fitsFully);
     if (!fits.length) {
       problems++;
-      out.push(`  ${c.yellow('!')} no installed model fits your VRAM — everything will partly run on CPU`);
+      out.push(warnLine('no installed model fits your VRAM — everything runs partly on CPU'));
     }
   }
 
@@ -242,8 +286,11 @@ async function cmdDoctor(services: Services): Promise<number> {
   if (services.gpu.gpus.length) {
     for (const g of services.gpu.gpus) {
       out.push(
-        `  ${c.green('✓')} ${c.bold(g.name)} — ${formatMb(g.totalMb)}${g.unified ? ' unified' : ' VRAM'}` +
-          (g.freeMb !== null ? muted(`, ${formatMb(g.freeMb)} free`) : '')
+        check(
+          c.bold(g.name),
+          `${formatMb(g.totalMb)}${g.unified ? ' unified' : ' VRAM'}` +
+            (g.freeMb !== null ? `, ${formatMb(g.freeMb)} free` : '')
+        )
       );
     }
     if (services.gpu.totalVramMb > 0 && services.gpu.totalVramMb < 6000) {
@@ -252,7 +299,7 @@ async function cmdDoctor(services: Services): Promise<number> {
       );
     }
   } else {
-    out.push(`  ${c.yellow('!')} no GPU detected (${services.gpu.detectedBy}) — generation will be slow on CPU`);
+    out.push(warnLine(`no GPU detected (${services.gpu.detectedBy})`, 'generation will be slow on CPU'));
   }
 
   const envRecs = serverEnvRecommendations(services.config).filter(
@@ -266,22 +313,22 @@ async function cmdDoctor(services: Services): Promise<number> {
   out.push(heading('Skills & memory'));
   out.push(
     services.skills.count
-      ? `  ${c.green('✓')} ${services.skills.count} skills from ${services.skills.scanned.join(', ')}`
-      : `  ${c.yellow('!')} no skills found in ${services.config.skills.sources.join(', ')}`
+      ? check(`${services.skills.count} skills`, `from ${services.skills.scanned.join(', ')}`)
+      : warnLine('no skills found', `looked in ${services.config.skills.sources.join(', ')}`)
   );
   const memories = services.memory.list();
   const p = projectPaths(services.cwd);
   out.push(
     memories.length
-      ? `  ${c.green('✓')} ${memories.length} project memories in ${p.memory}`
+      ? check(`${memories.length} project memories`, p.memory)
       : existsSync(p.memory)
-        ? muted('  · memory initialised but empty — nave will fill it as it works')
-        : `  ${c.yellow('!')} this project is not initialised — run ${c.bold('nave init')}`
+        ? bullet(muted('memory initialised but empty — nave fills it as it works'))
+        : warnLine('this project is not initialised', `run ${c.bold('nave init')}`)
   );
   out.push(
     existsSync(p.conventions)
-      ? `  ${c.green('✓')} NAVE.md present`
-      : muted('  · no NAVE.md — nave init creates one')
+      ? check('NAVE.md present')
+      : bullet(muted('no NAVE.md — nave init creates one'))
   );
 
   // Runtime.
@@ -289,21 +336,23 @@ async function cmdDoctor(services: Services): Promise<number> {
   const major = Number(process.versions.node.split('.')[0]);
   out.push(
     major >= 22
-      ? `  ${c.green('✓')} Node ${process.versions.node}`
-      : `  ${c.red('✗')} Node ${process.versions.node} — nave needs 22.18 or newer`
+      ? check(`Node ${process.versions.node}`)
+      : crossLine(`Node ${process.versions.node}`, 'nave needs 22.18 or newer')
   );
   if (major < 22) problems++;
 
   const git = await which('git');
-  out.push(git ? `  ${c.green('✓')} git available` : muted('  · git not found — version-control tools will not work'));
+  out.push(git ? check('git available') : bullet(muted('git not found — version-control tools will not work')));
 
-  out.push('');
   out.push(
     problems === 0
-      ? `${c.green('Everything checks out.')} ${muted('Run "nave" in a project to start.')}`
-      : `${c.yellow(`${problems} thing(s) to fix.`)} ${muted('Each one above has the command to fix it.')}`
+      ? panel('Ready', ['Everything checks out.', '', `${accent('→')} run ${c.bold('nave')} in a project to start`], 'ok')
+      : panel(
+          `${problems} thing${problems === 1 ? '' : 's'} to fix`,
+          ['Each item marked above carries the command that fixes it.'],
+          'warn'
+        )
   );
-  out.push('');
   process.stdout.write(out.join('\n'));
   return problems === 0 ? 0 : 1;
 }

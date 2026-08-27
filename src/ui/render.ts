@@ -1,8 +1,24 @@
-import { c, accent, muted, stripAnsi, truncate } from '../util/colors.ts';
+import { c, accent, muted, stripAnsi, truncate, width } from '../util/colors.ts';
 import { PRODUCT, VERSION, TAGLINE } from '../version.ts';
 import type { ToolResult } from '../tools/types.ts';
 
 const SPIN = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
+/**
+ * The spinner that currently owns the last terminal line. Prompts need to take
+ * that line over, so they suspend whatever is spinning rather than drawing on
+ * top of it — a spinner repainting under a question is what made the old
+ * permission prompt look frozen.
+ */
+let liveSpinner: Spinner | null = null;
+
+export function suspendSpinner(): () => void {
+  const s = liveSpinner;
+  if (!s || !s.running) return () => {};
+  const text = s.label;
+  s.stop();
+  return () => s.start(text);
+}
 
 export class Spinner {
   private timer: NodeJS.Timeout | null = null;
@@ -11,14 +27,26 @@ export class Spinner {
   private started = 0;
   private active = false;
 
+  get running(): boolean {
+    return this.active;
+  }
+
+  get label(): string {
+    return this.text;
+  }
+
   start(text: string): void {
     if (!process.stdout.isTTY) {
-      if (text) process.stdout.write(`${muted(`… ${text}`)}\n`);
+      if (text && text !== this.text) {
+        this.text = text;
+        process.stdout.write(`${muted(`… ${text}`)}\n`);
+      }
       return;
     }
     this.text = text;
-    this.started = Date.now();
+    if (!this.started) this.started = Date.now();
     this.active = true;
+    liveSpinner = this;
     if (this.timer) return;
     this.timer = setInterval(() => this.tick(), 90);
     this.timer.unref?.();
@@ -42,7 +70,15 @@ export class Spinner {
       clearInterval(this.timer);
       this.timer = null;
     }
+    if (liveSpinner === this) liveSpinner = null;
     if (process.stdout.isTTY) process.stdout.write('\r\u001b[2K');
+  }
+
+  /** Forget the elapsed clock — call between turns, not between steps. */
+  reset(): void {
+    this.stop();
+    this.started = 0;
+    this.text = '';
   }
 }
 
@@ -114,6 +150,118 @@ export function banner(subtitle: string): string {
     `  ${muted(subtitle)}`,
     '',
   ].join('\n');
+}
+
+const G = {
+  tl: '╭', tr: '╮', bl: '╰', br: '╯', h: '─', v: '│', bar: '▌',
+};
+
+function termWidth(max = 78): number {
+  return Math.min(max, Math.max(40, (process.stdout.columns ?? 80) - 2));
+}
+
+/** The wordmark, drawn once at the top of a session or a setup command. */
+export function wordmark(subtitle?: string): string {
+  const w = termWidth();
+  const name = `${c.bold(accent('nave'))}${c.bold('-code')}`;
+  const rule = muted(G.h.repeat(Math.max(0, w - width(`  ${PRODUCT} v${VERSION}  `) - 2)));
+  const lines = [
+    '',
+    `  ${name} ${muted(`v${VERSION}`)} ${rule}`,
+    `  ${muted(TAGLINE)}`,
+  ];
+  if (subtitle) lines.push(`  ${muted(subtitle)}`);
+  lines.push('');
+  return lines.join('\n');
+}
+
+export type Tone = 'accent' | 'ok' | 'warn' | 'bad' | 'plain';
+
+const TONE: Record<Tone, (s: string) => string> = {
+  accent: (s) => accent(s),
+  ok: (s) => c.green(s),
+  warn: (s) => c.yellow(s),
+  bad: (s) => c.red(s),
+  plain: (s) => muted(s),
+};
+
+/**
+ * A bordered block. Used for anything the user must read rather than skim —
+ * setup results, errors, the "what now" panel after init.
+ */
+export function panel(
+  title: string,
+  body: string[],
+  tone: Tone = 'accent'
+): string {
+  const paint = TONE[tone];
+  const w = termWidth();
+  const inner = w - 2;
+  const heading = ` ${title} `;
+  const fill = Math.max(0, inner - width(heading) - 1);
+  const out: string[] = [
+    '',
+    paint(G.tl) + paint(G.h) + c.bold(paint(heading)) + paint(G.h.repeat(fill)) + paint(G.tr),
+  ];
+  const cell = inner - 2;
+  const row = (text: string): string => {
+    const gap = ' '.repeat(Math.max(0, cell - width(text)));
+    return `${paint(G.v)} ${text}${gap} ${paint(G.v)}`;
+  };
+  for (const line of body) {
+    if (line === '') {
+      out.push(row(''));
+      continue;
+    }
+    for (const wrapped of wrap(line, cell)) out.push(row(wrapped));
+  }
+  out.push(paint(G.bl) + paint(G.h.repeat(inner)) + paint(G.br));
+  out.push('');
+  return out.join('\n');
+}
+
+/** A left-barred block — lighter than a panel, for grouped status lines. */
+export function block(body: string[], tone: Tone = 'plain'): string {
+  const paint = TONE[tone];
+  return body.map((l) => `${paint(G.bar)} ${l}`).join('\n');
+}
+
+export function check(label: string, detail?: string): string {
+  return `  ${c.green('✓')} ${label}${detail ? ` ${muted(detail)}` : ''}`;
+}
+
+export function warnLine(label: string, detail?: string): string {
+  return `  ${c.yellow('!')} ${label}${detail ? ` ${muted(detail)}` : ''}`;
+}
+
+export function crossLine(label: string, detail?: string): string {
+  return `  ${c.red('✗')} ${label}${detail ? ` ${muted(detail)}` : ''}`;
+}
+
+export function bullet(label: string): string {
+  return `  ${muted('·')} ${label}`;
+}
+
+export function step(n: number, label: string): string {
+  return `  ${accent(c.bold(String(n)))} ${muted('│')} ${c.bold(label)}`;
+}
+
+/** Wrap on word boundaries, ANSI-aware enough for our own styled strings. */
+export function wrap(text: string, max: number): string[] {
+  if (width(text) <= max) return [text];
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let line = '';
+  for (const word of words) {
+    if (line && width(line) + 1 + width(word) > max) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = line ? `${line} ${word}` : word;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
 }
 
 export function toolLine(name: string, args: Record<string, unknown>): string {

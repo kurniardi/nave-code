@@ -13,7 +13,10 @@ export function writeProjectScaffold(cwd: string): string[] {
   const created: string[] = [];
 
   ensureDir(p.root);
-  ensureDir(p.agents);
+  if (!existsSync(p.agents)) {
+    ensureDir(p.agents);
+    created.push(rel(cwd, p.agents));
+  }
 
   const store = new MemoryStore(cwd);
   if (!existsSync(p.memoryIndex)) {

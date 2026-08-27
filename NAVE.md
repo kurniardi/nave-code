@@ -21,8 +21,11 @@ npm run build          # optional dist/ build for faster startup
 node src/index.ts doctor
 ```
 
-There is no test suite yet. Verify changes by running `doctor`, `models`, `gpu`,
-and at least one real turn: `node src/index.ts --cwd <scratch> --yes -p "..."`.
+`npm test` covers the interactive input path against a simulated TTY. Beyond
+that, verify changes by running `doctor`, `models`, `gpu`, and at least one real
+turn: `node src/index.ts --cwd <scratch> --yes -p "..."`. For anything touching
+prompts, also drive the REPL through a pipe — the piped and TTY input paths are
+genuinely different code.
 
 ## Conventions
 
@@ -38,8 +41,11 @@ and at least one real turn: `node src/index.ts --cwd <scratch> --yes -p "..."`.
   ESC, never the raw characters — some editors and tools silently mangle them.
 - Errors the user sees say what to do next, not just what went wrong. Every
   failure path in `OllamaClient` carries a `hint`.
-- Terminal output is built from the helpers in `src/ui/render.ts`. Do not hand-
-  roll ANSI or table padding.
+- Terminal output is built from the helpers in `src/ui/render.ts` — `panel`,
+  `block`, `check`/`warnLine`/`crossLine`, `table`, `wordmark`. Do not hand-roll
+  ANSI or table padding.
+- All interactive input goes through `InputController` in `src/ui/input.ts`.
+  Never open a second `readline` on stdin; see the `one-owner-of-stdin` memory.
 
 ## Architecture
 

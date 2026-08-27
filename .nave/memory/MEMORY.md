@@ -14,6 +14,7 @@ Loaded at the start of every nave session — keep it short and true.
 
 ## Architecture
 
+- [Only one thing may hold stdin at a time](one-owner-of-stdin.md) — Reusing the session readline for permission prompts deadlocks; InputController owns stdin and releases it between prompts.
 - [Slash commands and CLI subcommands share one implementation](slash-commands-are-the-cli.md) — Commands live once in src/commands/slash.ts; cmdViaSlash exposes them to the shell.
 
 ## Gotcha
