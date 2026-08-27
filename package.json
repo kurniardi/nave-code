@@ -1,0 +1,40 @@
+{
+  "name": "nave-code",
+  "version": "0.1.0",
+  "description": "Offline-first terminal coding agent powered by local Ollama models. No API keys, no billing, no cloud.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "nave": "bin/nave.mjs",
+    "nave-code": "bin/nave.mjs"
+  },
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "dev": "node src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "doctor": "node src/index.ts doctor"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "src",
+    "README.md",
+    "NAVE.md"
+  ],
+  "keywords": [
+    "ollama",
+    "cli",
+    "agent",
+    "offline",
+    "local-llm",
+    "coding-agent"
+  ],
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  }
+}

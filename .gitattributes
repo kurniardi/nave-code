@@ -1,0 +1,8 @@
+# Keep LF in the repository regardless of the checkout platform.
+# nave is developed on Windows; without this, every file lands with CRLF and
+# any future formatter or linter reports the whole tree as changed.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.gz  binary
