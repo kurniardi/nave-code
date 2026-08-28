@@ -243,12 +243,14 @@ export class Agent {
             model,
             messages: this.session.messages,
             tools: toolMode === 'native' ? selection.specs : undefined,
-            // Be explicit. Omitting this lets the model decide, and qwen3-class
-            // models think by default — thousands of invisible tokens out of a
-            // window this small, with nothing shown for them.
-            think: profile.supportsThinking
-              ? services.config.ui.showThinking
-              : undefined,
+            // Be explicit, and ask for it. Omitting this lets the model
+            // decide; think:false does not stop a qwen3-class model reasoning,
+            // it only moves the reasoning out of the thinking field and into
+            // content, where it lands in the answer and the transcript. Asking
+            // for it keeps content clean. ui.showThinking decides whether the
+            // user sees it, and history drops it, so the window is not spent
+            // on it twice.
+            think: profile.supportsThinking ? true : undefined,
             options,
             signal,
           },

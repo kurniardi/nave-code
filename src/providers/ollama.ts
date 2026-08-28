@@ -265,7 +265,9 @@ function serialiseMessage(m: ChatMessage): Record<string, unknown> {
   if (m.images?.length) out.images = m.images;
   if (m.tool_calls?.length) out.tool_calls = m.tool_calls;
   if (m.tool_name) out.tool_name = m.tool_name;
-  if (m.thinking) out.thinking = m.thinking;
+  // Reasoning is deliberately not sent back. A qwen3-class model expects its
+  // own past thinking stripped from the history, and resending it would spend
+  // the window on tokens the model has already used.
   return out;
 }
 
