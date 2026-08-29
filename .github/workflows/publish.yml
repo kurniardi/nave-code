@@ -7,12 +7,9 @@ name: Publish
 on:
   release:
     types: [published]
+  # Manual runs verify only and never publish, so this is safe to run at any
+  # time to check the release path. Publishing needs a published Release.
   workflow_dispatch:
-    inputs:
-      dry_run:
-        description: 'Pack and verify without publishing'
-        type: boolean
-        default: true
 
 permissions:
   contents: read
@@ -79,6 +76,8 @@ jobs:
         if: github.event_name == 'release'
         run: npm publish
 
-      - name: Dry run only
+      - name: Verified, not published
         if: github.event_name != 'release'
-        run: echo "Verified without publishing. Publish by publishing a GitHub Release."
+        run: |
+          echo "Everything above passed and nothing was published."
+          echo "To publish, publish a GitHub Release tagged v<version>."
