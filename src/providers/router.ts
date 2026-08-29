@@ -3,7 +3,7 @@ import { dirname } from 'node:path';
 import { ensureDir, userPaths } from '../config/paths.ts';
 import type { NaveConfig, Role } from '../config/config.ts';
 import { OllamaClient, buildProfile } from './ollama.ts';
-import type { ModelProfile } from './types.ts';
+import type { ModelProfile, RunningModel } from './types.ts';
 import { familyFor, GENERIC } from './catalog.ts';
 import type { GpuReport } from '../gpu/detect.ts';
 import { planRuntime, kvBytesPerToken } from '../gpu/tuning.ts';
@@ -37,8 +37,8 @@ export class ModelRouter {
   private profiles: ModelProfile[] = [];
   private byName = new Map<string, ModelProfile>();
   private loaded = false;
-  /** model name → VRAM it currently holds, from /api/ps. */
-  private resident = new Map<string, number>();
+  /** model name → what /api/ps says it is doing right now. */
+  private resident = new Map<string, RunningModel>();
 
   private client: OllamaClient;
   private config: NaveConfig;
@@ -99,14 +99,27 @@ export class ModelRouter {
   async refreshResident(): Promise<void> {
     try {
       const running = await this.client.ps();
-      this.resident = new Map(running.map((r) => [r.name, r.sizeVramMb]));
+      this.resident = new Map(running.map((r) => [r.name, r]));
     } catch {
       this.resident = new Map();
     }
   }
 
+  private running(name: string): RunningModel | null {
+    return this.resident.get(name) ?? this.resident.get(`${name}:latest`) ?? null;
+  }
+
   residentMb(name: string): number {
-    return this.resident.get(name) ?? this.resident.get(`${name}:latest`) ?? 0;
+    return this.running(name)?.sizeVramMb ?? 0;
+  }
+
+  /**
+   * The share of a loaded model that is genuinely on the GPU, or null when it
+   * is not loaded. Ollama measures this; `plan().fitsFully` only predicts it,
+   * and the two disagree whenever the VRAM arithmetic was off.
+   */
+  residentGpuFraction(name: string): number | null {
+    return this.running(name)?.gpuFraction ?? null;
   }
 
   get(name: string): ModelProfile | null {

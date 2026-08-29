@@ -4,6 +4,15 @@
   "description": "Offline-first terminal coding agent powered by local Ollama models. No API keys, no billing, no cloud.",
   "type": "module",
   "license": "MIT",
+  "author": "kurniardi",
+  "homepage": "https://github.com/kurniardi/nave-code#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kurniardi/nave-code.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kurniardi/nave-code/issues"
+  },
   "bin": {
     "nave": "bin/nave.mjs",
     "nave-code": "bin/nave.mjs"
@@ -17,13 +26,14 @@
     "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "doctor": "node src/index.ts doctor",
-    "test": "node scripts/test-input.ts && node scripts/test-paste.ts"
+    "logo": "node scripts/make-logo.ts",
+    "test": "node scripts/test-input.ts && node scripts/test-paste.ts && node scripts/test-gpu.ts"
   },
   "files": [
     "bin",
-    "dist",
     "src",
     "README.md",
+    "INSTALL.md",
     "NAVE.md"
   ],
   "keywords": [

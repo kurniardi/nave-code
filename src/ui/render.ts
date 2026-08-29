@@ -1,5 +1,6 @@
 import { c, accent, muted, stripAnsi, truncate, width } from '../util/colors.ts';
 import { PRODUCT, VERSION, TAGLINE } from '../version.ts';
+import { logo } from './logo.ts';
 import type { ToolResult } from '../tools/types.ts';
 
 const SPIN = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
@@ -160,17 +161,33 @@ function termWidth(max = 78): number {
   return Math.min(max, Math.max(40, (process.stdout.columns ?? 80) - 2));
 }
 
-/** The wordmark, drawn once at the top of a session or a setup command. */
+/**
+ * The wordmark, drawn once at the top of a session or a setup command. The
+ * brand mark sits to its left when the terminal has the colours and the width
+ * for it; everywhere else — piped output, NO_COLOR, a cramped split — the same
+ * three lines are drawn under a rule instead.
+ */
 export function wordmark(subtitle?: string): string {
-  const w = termWidth();
+  const columns = process.stdout.columns ?? 80;
   const name = `${c.bold(accent('nave'))}${c.bold('-code')}`;
-  const rule = muted(G.h.repeat(Math.max(0, w - width(`  ${PRODUCT} v${VERSION}  `) - 2)));
-  const lines = [
-    '',
-    `  ${name} ${muted(`v${VERSION}`)} ${rule}`,
-    `  ${muted(TAGLINE)}`,
-  ];
-  if (subtitle) lines.push(`  ${muted(subtitle)}`);
+  const text = [`${name} ${muted(`v${VERSION}`)}`, muted(TAGLINE)];
+  if (subtitle) text.push(muted(subtitle));
+
+  const mark = logo(columns, Math.max(...text.map(width)));
+  if (!mark) {
+    const w = termWidth();
+    const rule = muted(G.h.repeat(Math.max(0, w - width(`  ${PRODUCT} v${VERSION}  `) - 2)));
+    const rest = text.slice(1).map((l) => `  ${truncate(l, columns - 3)}`);
+    return ['', `  ${text[0]} ${rule}`, ...rest, ''].join('\n');
+  }
+
+  // Centre the text against the mark.
+  const top = Math.max(0, Math.floor((mark.lines.length - text.length) / 2));
+  const lines = [''];
+  mark.lines.forEach((row, i) => {
+    const beside = text[i - top];
+    lines.push(`  ${row}${beside ? `   ${truncate(beside, mark.room)}` : ''}`);
+  });
   lines.push('');
   return lines.join('\n');
 }

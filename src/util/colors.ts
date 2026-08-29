@@ -13,6 +13,18 @@ export function colorEnabled(): boolean {
   return enabled;
 }
 
+/**
+ * How much colour the terminal can show, in bits: 24 for truecolour, 8 for the
+ * 256-colour palette, 4 for the basic sixteen, 1 for none. Node already works
+ * this out from TERM, COLORTERM and the Windows build, so we ask it rather
+ * than keeping our own table of terminals.
+ */
+export function colorDepth(): number {
+  if (!enabled) return 1;
+  const out = process.stdout as { getColorDepth?: () => number };
+  return typeof out.getColorDepth === 'function' ? out.getColorDepth() : 4;
+}
+
 const wrap =
   (open: number, close: number) =>
   (s: string | number): string =>

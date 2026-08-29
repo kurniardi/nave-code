@@ -63,10 +63,28 @@ function finish(
   systemRamMb: number,
   detectedBy: string
 ): GpuReport {
-  const totalVramMb = gpus
+  const ordered = orderGpus(gpus);
+  const totalVramMb = ordered
     .filter((g) => !g.unified)
     .reduce((sum, g) => sum + g.totalMb, 0);
-  return { gpus, systemRamMb, detectedBy, totalVramMb };
+  return { gpus: ordered, systemRamMb, detectedBy, totalVramMb };
+}
+
+/**
+ * Strongest device first, because everything downstream plans against gpus[0]
+ * and it has to be the one that will really run the model.
+ *
+ * Win32_VideoController lists adapters in enumeration order, which on a hybrid
+ * laptop puts the integrated GPU ahead of the discrete one. Left alone, a 6 GB
+ * discrete card gets budgeted as 1 GB of shared system RAM and every model
+ * looks like it needs CPU offload. Dedicated VRAM beats shared, then the
+ * larger card wins.
+ */
+export function orderGpus(gpus: GpuInfo[]): GpuInfo[] {
+  return [...gpus].sort((a, b) => {
+    if (a.unified !== b.unified) return a.unified ? 1 : -1;
+    return b.totalMb - a.totalMb;
+  });
 }
 
 async function detectNvidia(): Promise<GpuInfo[]> {
@@ -189,7 +207,9 @@ async function detectWindowsGeneric(): Promise<GpuInfo[]> {
           freeMb: null,
           usedMb: null,
           driver: rec.DriverVersion ? String(rec.DriverVersion) : undefined,
-          unified: vendor === 'intel',
+          // Intel integrated graphics carve their memory out of system RAM.
+          // Arc is a discrete card with its own, so it does not count as one.
+          unified: vendor === 'intel' && !/\barc\b/i.test(name),
         };
       })
       .filter((g) => g.totalMb > 0);

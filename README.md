@@ -23,6 +23,9 @@ cd your-project && nave init
 nave
 ```
 
+New here? [**INSTALL.md**](INSTALL.md) walks through Node, Ollama and your first
+model with copy-paste commands for Windows (PowerShell and cmd), macOS and Linux.
+
 ---
 
 ## Requirements
@@ -32,6 +35,8 @@ nave
 | Node | 22.18 or newer (24 recommended) |
 | Ollama | running locally — `ollama serve` |
 | GPU | optional; nave adapts to what you have, including none |
+
+Full per-platform setup: [INSTALL.md](INSTALL.md).
 
 nave has **zero runtime dependencies**. It runs its own TypeScript directly on
 Node, so there is nothing to build and nothing to install from npm at runtime.
@@ -316,7 +321,15 @@ npm install          # typescript + @types/node, dev only
 npm run dev          # node src/index.ts
 npm run typecheck
 npm run build        # optional: dist/ for faster startup
+npm run logo         # re-sample icons/nave.png into src/ui/logo-art.ts
 ```
+
+The mark nave draws at startup is `icons/nave.png`, sampled down to terminal
+cells ahead of time and committed as `src/ui/logo-art.ts` in three widths — 32,
+24 and 16 cells, whichever the terminal has room for beside the tagline. Each
+cell carries four subpixels drawn with a quadrant block, so edges stay edges.
+Nothing decodes an image at runtime and the published package carries no image
+at all. Change the icon, run `npm run logo`, commit the regenerated file.
 
 Read `NAVE.md` before changing anything — it is the brief nave itself follows in
 this repo.

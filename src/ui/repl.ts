@@ -7,6 +7,7 @@ import { Session } from '../session/session.ts';
 import { Permissions } from '../session/permissions.ts';
 import type { PermissionRequest } from '../session/permissions.ts';
 import type { PermissionMode } from '../config/config.ts';
+import type { RuntimePlan } from '../gpu/tuning.ts';
 import { TodoList } from '../tools/todo.ts';
 import { executeTurn, summariseTurn } from '../core/run.ts';
 import { findCommand, customCommands, expandCustomCommand } from '../commands/slash.ts';
@@ -60,6 +61,8 @@ export async function runRepl(opts: ReplOptions): Promise<number> {
   let announceModel = true;
   let emptyInterrupts = 0;
   let carryOver = '';
+  /** The CPU-offload split already reported, so it is not repeated each turn. */
+  const reportedOffload: { key: string | null } = { key: null };
 
   for (;;) {
     let text: string;
@@ -160,7 +163,10 @@ export async function runRepl(opts: ReplOptions): Promise<number> {
           tps: result.tokensPerSecond,
           steps: result.steps,
         };
-        process.stdout.write(`\n${summariseTurn(result)}\n\n`);
+        const lines = [summariseTurn(result)];
+        const note = await offloadNote(services, result.model, reportedOffload);
+        if (note) lines.push(note);
+        process.stdout.write(`\n${lines.join('\n')}\n\n`);
       }
     } catch (err) {
       process.stdout.write(errorBox('Unexpected error', String((err as Error).message)) + '\n');
@@ -213,9 +219,8 @@ function sessionHeader(services: Services, permissions: Permissions): string {
 
   if (pick) {
     const plan = services.router.plan(pick.profile);
-    const fit = plan.fitsFully ? c.green('all on GPU') : c.yellow(`${plan.numGpu ?? '?'} layers on GPU`);
     rows.push(
-      `${muted('model  ')}  ${c.bold(pick.model)} ${muted(`· ${Math.round(plan.numCtx / 1024)}k context ·`)} ${fit}`
+      `${muted('model  ')}  ${c.bold(pick.model)} ${muted(`· ${Math.round(plan.numCtx / 1024)}k context ·`)} ${gpuFit(services, pick.model, plan)}`
     );
   }
   if (gpu) {
@@ -229,6 +234,52 @@ function sessionHeader(services: Services, permissions: Permissions): string {
   rows.push(`${muted('context')}  ${context.join(muted('  ·  '))}`);
 
   return block(rows, 'accent');
+}
+
+/**
+ * Where the model runs — measured when Ollama already has it loaded, predicted
+ * when it does not. Worth keeping apart: the plan is nave's VRAM arithmetic and
+ * can be wrong, while /api/ps is what actually happened. On a hybrid laptop the
+ * measured line is also the answer to "is this on my discrete card or not".
+ */
+function gpuFit(services: Services, model: string, plan: RuntimePlan): string {
+  const measured = services.router.residentGpuFraction(model);
+  if (measured === null) {
+    return plan.fitsFully
+      ? muted('all on GPU once loaded')
+      : c.yellow(`${plan.numGpu ?? '?'} layers on GPU once loaded`);
+  }
+  const pct = Math.round(measured * 100);
+  return pct >= 99
+    ? c.green('100% on GPU')
+    : c.yellow(`${pct}% on GPU, ${100 - pct}% on CPU`);
+}
+
+/**
+ * What Ollama actually did, once a turn has proved it. Silent while everything
+ * is on the GPU, and silent about a split it has already reported — this is a
+ * correction to the startup estimate, not a per-turn status line.
+ */
+async function offloadNote(
+  services: Services,
+  model: string,
+  reported: { key: string | null }
+): Promise<string | null> {
+  await services.router.refreshResident();
+  const measured = services.router.residentGpuFraction(model);
+  if (measured === null || measured >= 0.99) {
+    reported.key = null;
+    return null;
+  }
+  const pct = Math.round(measured * 100);
+  const key = `${model}@${pct}`;
+  if (key === reported.key) return null;
+  reported.key = key;
+  return (
+    `  ${c.yellow('·')} ` +
+    muted(`${model} loaded ${pct}% on GPU — the rest is running on the CPU. `) +
+    muted(`${c.bold('/gpu')} shows why.`)
+  );
 }
 
 function startupWarnings(services: Services): string[] {
@@ -267,8 +318,12 @@ function startupWarnings(services: Services): string[] {
     );
   }
 
+  // Measured beats predicted. When Ollama already has the model loaded and
+  // fully on the GPU, the estimate was merely pessimistic — warning about CPU
+  // offload that demonstrably is not happening trains people to ignore it.
+  const measured = services.router.residentGpuFraction(pick.model);
   const plan = services.router.plan(pick.profile);
-  if (!plan.fitsFully) {
+  if (!plan.fitsFully && !(measured !== null && measured >= 0.99)) {
     out.push(
       panel(
         'Running partly on CPU',
