@@ -53,6 +53,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24.x
+          cache: npm
+
+      # Needed before packing: prepack runs `npm run build`, and tsc lives in
+      # devDependencies. Without this the pack fails with "tsc not recognized".
+      - run: npm ci
 
       # --pack-destination does not create the directory; npm fails with ENOENT.
       - name: Pack
