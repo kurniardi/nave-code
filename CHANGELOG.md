@@ -4,6 +4,35 @@ Notable changes to nave-code. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.1.2 — 2026-08-29
+
+A documentation and packaging release. `bin/` and `src/` are byte-identical to
+0.1.1, so nave behaves exactly as it did — only the README shipped inside the
+package changed.
+
+### Changed
+
+- The README carries build, npm, Node and licence badges, links to the security
+  policy and code of conduct, and a Community section with the channels where
+  walkthroughs are posted.
+- Wording no longer describes nave by comparison to another agent.
+  Capabilities are stated directly.
+- The skills documentation lists `skills.sources` in the order the loader
+  actually reads them, and says that later sources shadow earlier ones by name.
+
+### Repository
+
+Not shipped in the npm package, but new in this release:
+
+- [`SECURITY.md`](SECURITY.md) — the boundaries that actually exist: what the
+  file and `http` tools refuse, what each permission mode guarantees, and which
+  files on disk end up shaping the instructions the model receives.
+- [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md), a pull request template, and a
+  release procedure in [`CONTRIBUTING.md`](CONTRIBUTING.md).
+- Releases publish through npm trusted publishing, so no npm token exists in
+  this repository. The workflow installs the packed tarball and runs the binary
+  before it publishes anything.
+
 ## 0.1.1 — 2026-08-29
 
 ### Fixed

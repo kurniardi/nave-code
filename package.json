@@ -1,6 +1,6 @@
 {
   "name": "nave-code",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Offline-first terminal coding agent powered by local Ollama models. No API keys, no billing, no cloud.",
   "type": "module",
   "license": "MIT",
