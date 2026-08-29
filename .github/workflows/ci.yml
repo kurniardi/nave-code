@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: ${{ matrix.os }} · Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # 22.18 is the floor declared in engines — the release where Node
+        # learned to run TypeScript directly. If it breaks there, the README
+        # is lying.
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: ['22.18.0', '24.x']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      # The runner has only what git tracks. A module that is imported but
+      # never committed passes locally and dies here, which is the point.
+      - name: Boot from a clean checkout
+        run: node bin/nave.mjs --help
+
+  package:
+    name: published tarball runs
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+
+      # --pack-destination does not create the directory; npm fails with ENOENT.
+      - name: Pack
+        run: |
+          mkdir -p /tmp/pack
+          npm pack --pack-destination /tmp/pack
+
+      # Guards the `files` list. nave ships source and no build output, so if
+      # something needed at runtime falls outside `files`, only running the
+      # tarball from outside the repo will show it.
+      - name: Run nave from the tarball, outside the repo
+        run: |
+          cd /tmp/pack
+          tar -xzf nave-code-*.tgz
+          node package/bin/nave.mjs --help

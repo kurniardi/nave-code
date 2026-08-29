@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Installation help
+    url: https://github.com/kurniardi/nave-code/blob/main/INSTALL.md
+    about: Node, Ollama and first-model setup for Windows, macOS and Linux, plus troubleshooting.
+  - name: Ollama itself is not working
+    url: https://github.com/ollama/ollama/issues
+    about: If `ollama --version` or `ollama serve` fails, the problem is upstream of nave.

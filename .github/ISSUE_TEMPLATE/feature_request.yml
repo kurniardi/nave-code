@@ -1,0 +1,54 @@
+name: Feature request
+description: Suggest something nave should do.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        nave has two hard rules that shape what can be accepted, so it is worth
+        knowing them before you write:
+
+        - **Zero runtime dependencies.** Anything that needs an npm package at
+          runtime is a no. An offline tool that needs the registry to start is
+          a contradiction.
+        - **No cloud fallback.** nave will not call a paid API, even when a
+          local model struggles.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do
+      description: >
+        Describe the situation, not the solution. What were you doing when nave
+        got in the way?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like nave to do
+    validations:
+      required: true
+
+  - type: input
+    id: vram
+    attributes:
+      label: Your VRAM
+      description: >
+        Only relevant for anything touching models, routing or context. nave is
+        developed against a 6 GB card, so proposals that assume 24 GB need to
+        say so.
+      placeholder: 8 GB, or "not relevant"
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Constraints
+      options:
+        - label: This needs no new runtime dependency
+          required: false
+        - label: This works with no network connection
+          required: false

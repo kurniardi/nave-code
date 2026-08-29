@@ -1,5 +1,10 @@
 # nave-code
 
+[![CI](https://github.com/kurniardi/nave-code/actions/workflows/ci.yml/badge.svg)](https://github.com/kurniardi/nave-code/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/nave-code)](https://www.npmjs.com/package/nave-code)
+[![node](https://img.shields.io/badge/node-%E2%89%A5%2022.18-brightgreen)](https://nodejs.org)
+[![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 A terminal coding agent that runs entirely on your own machine.
 
 nave is shaped like Claude Code — a REPL, a tool loop, sub-agents, skills, slash
@@ -334,4 +339,8 @@ at all. Change the icon, run `npm run logo`, commit the regenerated file.
 Read `NAVE.md` before changing anything — it is the brief nave itself follows in
 this repo.
 
-MIT.
+Contributions welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the setup and
+the rules that are load-bearing. Release notes are in
+[CHANGELOG.md](CHANGELOG.md).
+
+[MIT](LICENSE).

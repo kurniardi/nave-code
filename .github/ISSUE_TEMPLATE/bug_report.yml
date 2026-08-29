@@ -1,0 +1,76 @@
+name: Bug report
+description: Something in nave does not work the way it says it does.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Almost every nave bug depends on your hardware and which model you were
+        running, so the `nave doctor` output below is the most useful thing you
+        can give us. Please do not skip it.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you got instead.
+      placeholder: |
+        I ran `nave` in a TypeScript project and asked it to rename a function.
+        Expected it to edit the file; instead it printed the tool call as text.
+    validations:
+      required: true
+
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `nave doctor`
+      description: >
+        Run `nave doctor` in the project where the problem happened and paste
+        the whole thing. It covers Ollama, models, GPU, Node and skills at once.
+      render: text
+    validations:
+      required: true
+
+  - type: input
+    id: model
+    attributes:
+      label: Which model
+      description: >
+        The model in use when it broke. `nave models` lists them, and the REPL
+        shows the active one. Say "not sure" if nave chose it for you.
+      placeholder: qwen2.5-coder:7b
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - macOS
+        - Linux
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: >
+        The smallest sequence that shows the problem. If it only happens in one
+        project, say what is unusual about it.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before filing
+      options:
+        - label: '`nave doctor` reports Ollama as reachable'
+          required: false
+        - label: I am on Node 22.18 or newer (`node --version`)
+          required: false
+        - label: I searched existing issues
+          required: false
