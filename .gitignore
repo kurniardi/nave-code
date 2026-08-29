@@ -23,6 +23,15 @@ dist/
 # agent — that is what it is for.
 .nave/
 
+# Working documents. Scripts, notes and drafts live alongside the code while
+# they are being written, but they are not part of the project.
+*.docx
+*.doc
+*.pptx
+*.xlsx
+*.pdf
+~$*
+
 # Logs
 *.log
 
