@@ -4,6 +4,10 @@
 [![npm](https://img.shields.io/npm/v/nave-code)](https://www.npmjs.com/package/nave-code)
 [![node](https://img.shields.io/badge/node-%E2%89%A5%2022.18-brightgreen)](https://nodejs.org)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Website](https://img.shields.io/badge/Web-kerjaitumudah.com-4A5568?logo=googlechrome&logoColor=white)](https://www.kerjaitumudah.com/)
+[![YouTube](https://img.shields.io/badge/YouTube-%40kerjaitumudahcom-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/@kerjaitumudahcom)
+[![Instagram](https://img.shields.io/badge/Instagram-%40kerjaitumudahcom-E4405F?logo=instagram&logoColor=white)](https://www.instagram.com/kerjaitumudahcom/)
+[![TikTok](https://img.shields.io/badge/TikTok-%40kerjaitumudahcom-000000?logo=tiktok&logoColor=white)](https://www.tiktok.com/@kerjaitumudahcom)
 
 A terminal coding agent that runs entirely on your own machine.
 
@@ -322,6 +326,25 @@ Custom slash commands are Markdown files in `.nave/commands/` or
   when you ask for it.
 - Claim it verified something it did not run.
 
+[SECURITY.md](SECURITY.md) sets these out in full — what the file and `http`
+tools refuse, what each permission mode actually guarantees, and which files on
+disk end up shaping the instructions the model receives.
+
+---
+
+## Community
+
+Walkthroughs, setup guides and demos of nave running on real projects:
+
+- **Website** — [kerjaitumudah.com](https://www.kerjaitumudah.com/)
+- **YouTube** — [@kerjaitumudahcom](https://www.youtube.com/@kerjaitumudahcom)
+- **Instagram** — [@kerjaitumudahcom](https://www.instagram.com/kerjaitumudahcom/)
+- **TikTok** — [@kerjaitumudahcom](https://www.tiktok.com/@kerjaitumudahcom)
+
+Bugs and feature requests belong in
+[issues](https://github.com/kurniardi/nave-code/issues) — include the output of
+`nave doctor`, which reports your GPU, models and Node version in one go.
+
 ---
 
 ## Development
@@ -345,7 +368,11 @@ Read `NAVE.md` before changing anything — it is the brief nave itself follows 
 this repo.
 
 Contributions welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the setup and
-the rules that are load-bearing. Release notes are in
-[CHANGELOG.md](CHANGELOG.md).
+the rules that are load-bearing, and the [Code of Conduct](CODE_OF_CONDUCT.md)
+for how we work together. Release notes are in [CHANGELOG.md](CHANGELOG.md).
+
+Found a security problem? Please do not open a public issue — read
+[SECURITY.md](SECURITY.md), which also sets out where the boundaries actually
+are.
 
 [MIT](LICENSE).
