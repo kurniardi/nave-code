@@ -359,8 +359,11 @@ Three ways to help, in order of how much they actually matter:
 - **Report what breaks.** Local models and GPUs vary enormously, and the bugs
   that matter most are the ones on hardware the author does not own. Include
   your `nave doctor` output.
-- **Buy the author a coffee** — [saweria.co/kerjaitumudahcom](https://saweria.co/kerjaitumudahcom).
-  Entirely optional. Nothing in nave is or will be gated behind it.
+- **Buy the author a coffee.** Entirely optional, and nothing in nave is or
+  will be gated behind it.
+  [Saweria](https://saweria.co/kerjaitumudahcom) if you are in Indonesia,
+  [Buy Me a Coffee](https://buymeacoffee.com/kerjaitumudahcom) from anywhere
+  else.
 
 ---
 

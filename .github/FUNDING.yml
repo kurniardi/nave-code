@@ -1,3 +1,7 @@
-# Adds the Sponsor button to the repository header. Saweria is not one of
-# GitHub's built-in providers, so it goes through custom.
+# Adds the Sponsor button to the repository header.
+#
+# Buy Me a Coffee is a built-in GitHub provider and takes a username. Saweria
+# is not, so it goes through custom — it is the practical option for donors in
+# Indonesia.
+buy_me_a_coffee: kerjaitumudahcom
 custom: ["https://saweria.co/kerjaitumudahcom"]
