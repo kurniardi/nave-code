@@ -26,7 +26,7 @@ Two things make it more than a chat wrapper:
   different model for planning, coding and summarising.
 
 ```
-npm install -g nave-code     # or: git clone && npm link
+npm install -g nave-code
 nave doctor                  # check Ollama, models, GPU, skills
 cd your-project && nave init
 nave
@@ -34,6 +34,9 @@ nave
 
 New here? [**INSTALL.md**](INSTALL.md) walks through Node, Ollama and your first
 model with copy-paste commands for Windows (PowerShell and cmd), macOS and Linux.
+
+Want to change nave itself? Run it from a clone instead, so your edits take
+effect the moment you save: [Building from source](INSTALL.md#building-from-source).
 
 ---
 

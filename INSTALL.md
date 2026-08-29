@@ -403,14 +403,53 @@ live in `NAVE.md` and `.nave/` — delete those folders if you want them gone.
 
 ## Building from source
 
+Use this instead of `npm install -g` when you want to **change nave itself**.
+For simply using it, the global install above is the easier path.
+
+You need [git](https://git-scm.com) as well as Node.
+
 ```bash
 git clone https://github.com/kurniardi/nave-code.git
 cd nave-code
 npm install          # typescript + @types/node, dev only
 npm run typecheck
 npm test
-npm link             # puts `nave` on your PATH from this checkout
+npm link
 ```
+
+Run these one at a time, in order. `cd` and `npm install` are not optional:
+`git clone` only downloads the code, and `npm link` fails without the
+dev dependencies.
+
+### What `npm link` does
+
+It points the `nave` command on your PATH at this folder, rather than at a copy
+downloaded from npm. Two consequences:
+
+- **Your edits are live.** Change a file in `src/`, run `nave` again, and the
+  change is already there. No reinstall, no build step.
+- **It replaces the global install.** If you ran `npm install -g nave-code`
+  earlier, `nave` now runs your clone instead. That is the point, but it is
+  worth knowing which one you are running.
+
+Check which one is active at any time:
+
+```bash
+npm ls -g --depth=0
+```
+
+A linked package shows as a path to your clone. An ordinary install shows a
+version number.
+
+### Going back to the published version
+
+```bash
+npm uninstall -g nave-code
+npm install -g nave-code
+```
+
+The first line removes the link — it does not touch your clone, which stays
+where it is.
 
 `npm run dev` runs `node src/index.ts` directly, so day to day there is no build
 step in a checkout. `npm run build` produces `dist/`, and the launcher prefers it
