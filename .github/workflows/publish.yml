@@ -1,0 +1,84 @@
+# Publishing runs on a GitHub Release. Draft the release, tag it v<version>
+# matching package.json, and publishing happens when you publish the release.
+# No npm token is stored anywhere: npm trusts this workflow by name, so the
+# filename below must stay publish.yml to match the npmjs.com configuration.
+name: Publish
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Pack and verify without publishing'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  # Required for trusted publishing. npm exchanges this short-lived OIDC token
+  # for publish rights, which is why no NPM_TOKEN secret exists in this repo.
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Trusted publishing needs Node >= 22.14; 24 is what releases are cut on.
+          node-version: 24.x
+          registry-url: 'https://registry.npmjs.org'
+
+      # Trusted publishing needs npm >= 11.5.1. Whatever npm ships with Node
+      # today, pinning the upgrade here keeps the release independent of it.
+      - name: Use an npm that supports trusted publishing
+        run: |
+          npm install -g npm@latest
+          npm --version
+
+      - run: npm ci
+
+      # A release must not be able to ship something the branch would not.
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      # The tag is the thing humans read; package.json is the thing npm reads.
+      # If they disagree, the release is wrong somewhere and stops here.
+      - name: Check the tag matches package.json
+        if: github.event_name == 'release'
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          echo "tag=$tag package.json=$pkg"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::Tag $tag does not match package.json $pkg"
+            exit 1
+          fi
+
+      # Node refuses to strip types under node_modules, so a package that
+      # ships only src/ installs and then dies. 0.1.0 shipped that way. This
+      # runs the real install path before anything reaches the registry.
+      - name: Install the packed tarball and run it
+        run: |
+          mkdir -p /tmp/pack
+          npm pack --pack-destination /tmp/pack
+          mkdir -p /tmp/consumer
+          cd /tmp/consumer
+          npm init -y
+          npm install /tmp/pack/nave-code-*.tgz
+          ./node_modules/.bin/nave --help
+
+      - name: Publish to npm
+        if: github.event_name == 'release'
+        run: npm publish
+
+      - name: Dry run only
+        if: github.event_name != 'release'
+        run: echo "Verified without publishing. Publish by publishing a GitHub Release."

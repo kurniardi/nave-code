@@ -89,6 +89,26 @@ Explain *why* in the body when it is not obvious. If a change spans files that
 depend on each other, commit them together — a commit that leaves `main` unable
 to start is worse than a large one.
 
+## Releasing
+
+Maintainers only. Publishing runs from
+[`.github/workflows/publish.yml`](.github/workflows/publish.yml) using npm
+trusted publishing, so there is no npm token in this repository and none to
+rotate.
+
+1. Bump `version` in `package.json` and `VERSION` in `src/version.ts` — they
+   must agree.
+2. Add the release to [`CHANGELOG.md`](CHANGELOG.md).
+3. Commit and push.
+4. Draft a GitHub Release tagged `v<version>`, matching `package.json` exactly.
+   The workflow refuses to publish if they differ.
+5. Publish the release. The workflow typechecks, tests, packs the tarball,
+   installs it into a real `node_modules` and runs the binary before anything
+   reaches the registry.
+
+Run the workflow manually (**Actions** → *Publish* → *Run workflow*) to
+exercise everything except the publish step.
+
 ## Reporting bugs
 
 Open an issue and include the full `nave doctor` output. Nearly every bug in
