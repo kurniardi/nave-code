@@ -1,0 +1,3 @@
+# Adds the Sponsor button to the repository header. Saweria is not one of
+# GitHub's built-in providers, so it goes through custom.
+custom: ["https://saweria.co/kerjaitumudahcom"]

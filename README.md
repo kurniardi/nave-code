@@ -347,6 +347,23 @@ Bugs and feature requests belong in
 
 ---
 
+## Support
+
+nave is free, MIT-licensed, and has no paid tier, no telemetry and nothing to
+upsell. It is built on a 6 GB laptop GPU in spare time.
+
+Three ways to help, in order of how much they actually matter:
+
+- **Star the repository.** It costs nothing and is the main way people find a
+  project like this one.
+- **Report what breaks.** Local models and GPUs vary enormously, and the bugs
+  that matter most are the ones on hardware the author does not own. Include
+  your `nave doctor` output.
+- **Buy the author a coffee** — [saweria.co/kerjaitumudahcom](https://saweria.co/kerjaitumudahcom).
+  Entirely optional. Nothing in nave is or will be gated behind it.
+
+---
+
 ## Development
 
 ```bash
@@ -376,3 +393,21 @@ Found a security problem? Please do not open a public issue — read
 are.
 
 [MIT](LICENSE).
+
+---
+
+## Star history
+
+<a href="https://star-history.com/#kurniardi/nave-code&Date">
+  <picture>
+    <source
+      media="(prefers-color-scheme: dark)"
+      srcset="https://api.star-history.com/svg?repos=kurniardi/nave-code&type=Date&theme=dark"
+    />
+    <img
+      src="https://api.star-history.com/svg?repos=kurniardi/nave-code&type=Date"
+      alt="Star history chart for nave-code"
+      width="600"
+    />
+  </picture>
+</a>

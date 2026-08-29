@@ -13,8 +13,8 @@ package changed.
 ### Changed
 
 - The README carries build, npm, Node and licence badges, links to the security
-  policy and code of conduct, and a Community section with the channels where
-  walkthroughs are posted.
+  policy and code of conduct, a Community section with the channels where
+  walkthroughs are posted, a Support section, and a star history chart.
 - Wording no longer describes nave by comparison to another agent.
   Capabilities are stated directly.
 - The skills documentation lists `skills.sources` in the order the loader
