@@ -12,12 +12,16 @@ dist/
 .env
 .env.*
 
-# nave's own runtime files.
-# .nave/memory/ and NAVE.md are deliberately NOT ignored — they are how the
-# project shares context with the agent, and they belong in the repo.
-# Transcripts and cache are noise.
-.nave/sessions/
-.nave/cache/
+# nave's own working state — memory, transcripts, cache, local agents. All of
+# it stays on the machine it was written on and is not published.
+#
+# NAVE.md at the repo root is NOT ignored: it is the standing brief, it is
+# documentation, and it is meant to be read.
+#
+# Note this is a choice about *this* repository, not advice. In your own
+# projects, committing .nave/memory/ is how a team shares context with the
+# agent — that is what it is for.
+.nave/
 
 # Logs
 *.log
