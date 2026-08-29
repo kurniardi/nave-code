@@ -1,6 +1,6 @@
 {
   "name": "nave-code",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Offline-first terminal coding agent powered by local Ollama models. No API keys, no billing, no cloud.",
   "type": "module",
   "license": "MIT",
@@ -26,7 +26,6 @@
     "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "doctor": "node src/index.ts doctor",
-    "logo": "node scripts/make-logo.ts",
     "test": "node scripts/test-input.ts && node scripts/test-paste.ts && node scripts/test-gpu.ts",
     "prepack": "npm run build"
   },

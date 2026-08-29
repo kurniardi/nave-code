@@ -374,15 +374,14 @@ npm install          # typescript + @types/node, dev only
 npm run dev          # node src/index.ts
 npm run typecheck
 npm run build        # optional: dist/ for faster startup
-npm run logo         # re-sample icons/nave.png into src/ui/logo-art.ts
 ```
 
-The mark nave draws at startup is `icons/nave.png`, sampled down to terminal
-cells ahead of time and committed as `src/ui/logo-art.ts` in three widths — 32,
-24 and 16 cells, whichever the terminal has room for beside the tagline. Each
-cell carries four subpixels drawn with a quadrant block, so edges stay edges.
-Nothing decodes an image at runtime and the published package carries no image
-at all. Change the icon, run `npm run logo`, commit the regenerated file.
+The wordmark nave draws at startup lives in `src/ui/logo.ts`, spelled out in
+box-drawing glyphs. It used to be sampled from a PNG, which meant every terminal
+cell held the average of the pixels beneath it — at terminal resolution that
+reads as blur, and it got worse the further a screen recording zoomed in.
+Letters are drawn by the font instead, so they stay sharp at any size and need
+no colour support to be legible.
 
 Read `NAVE.md` before changing anything — it is the brief nave itself follows in
 this repo.

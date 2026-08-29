@@ -162,10 +162,12 @@ function termWidth(max = 78): number {
 }
 
 /**
- * The wordmark, drawn once at the top of a session or a setup command. The
- * brand mark sits to its left when the terminal has the colours and the width
- * for it; everywhere else — piped output, NO_COLOR, a cramped split — the same
- * three lines are drawn under a rule instead.
+ * The wordmark, drawn once at the top of a session or a setup command.
+ *
+ * The mark spells NAVE, so the second half of the name is set beneath it —
+ * letter-spaced to the same visual weight — and the version and tagline follow.
+ * When the terminal is too narrow for the mark, the same information collapses
+ * to the single line under a rule.
  */
 export function wordmark(subtitle?: string): string {
   const columns = process.stdout.columns ?? 80;
@@ -173,7 +175,7 @@ export function wordmark(subtitle?: string): string {
   const text = [`${name} ${muted(`v${VERSION}`)}`, muted(TAGLINE)];
   if (subtitle) text.push(muted(subtitle));
 
-  const mark = logo(columns, Math.max(...text.map(width)));
+  const mark = logo(columns);
   if (!mark) {
     const w = termWidth();
     const rule = muted(G.h.repeat(Math.max(0, w - width(`  ${PRODUCT} v${VERSION}  `) - 2)));
@@ -181,13 +183,10 @@ export function wordmark(subtitle?: string): string {
     return ['', `  ${text[0]} ${rule}`, ...rest, ''].join('\n');
   }
 
-  // Centre the text against the mark.
-  const top = Math.max(0, Math.floor((mark.lines.length - text.length) / 2));
-  const lines = [''];
-  mark.lines.forEach((row, i) => {
-    const beside = text[i - top];
-    lines.push(`  ${row}${beside ? `   ${truncate(beside, mark.room)}` : ''}`);
-  });
+  const lines = ['', ...mark.lines.map((row) => `  ${row}`)];
+  lines.push(`  ${c.bold('C O D E')}   ${muted('·')}   ${muted(`v${VERSION}`)}`);
+  lines.push(`  ${truncate(muted(TAGLINE), columns - 3)}`);
+  if (subtitle) lines.push(`  ${truncate(muted(subtitle), columns - 3)}`);
   lines.push('');
   return lines.join('\n');
 }

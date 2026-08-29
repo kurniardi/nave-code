@@ -195,7 +195,7 @@ nave doctor
 tells you what to fix:
 
 ```
-  nave-code v0.1.2 ────────────────────────────────────────────────
+  nave-code v0.1.3 ────────────────────────────────────────────────
   local-first coding agent, powered by your own GPU
   checking this machine
 

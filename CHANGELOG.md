@@ -4,6 +4,28 @@ Notable changes to nave-code. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.1.3 — 2026-08-29
+
+### Changed
+
+- **The startup mark is now drawn as letters instead of a sampled image.**
+  The old mark came from `icons/nave.png`, reduced to terminal cells where
+  each cell held the average of the pixels under it. At terminal resolution
+  that reads as blur, and subpixel quadrant blocks could not fix it — the
+  source detail was simply finer than a cell, and screen recordings made it
+  worse. The wordmark is now spelled in box-drawing glyphs, so the font draws
+  it at whatever size the terminal is using and it stays sharp when zoomed.
+
+  It also no longer needs 256 colours to appear: without colour the glyphs
+  still spell the name, so only a narrow terminal falls back to the
+  single-line wordmark.
+
+### Removed
+
+- `src/ui/logo-art.ts`, `scripts/make-logo.ts` and the `npm run logo` script.
+  The image pipeline they existed for is gone. `icons/nave.png` stays as a
+  brand asset but is no longer read by anything.
+
 ## 0.1.2 — 2026-08-29
 
 A documentation and packaging release. `bin/` and `src/` are byte-identical to
