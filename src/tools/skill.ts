@@ -5,8 +5,8 @@ import { estimateTokens } from '../util/tokens.ts';
 const MAX_SKILL_TOKENS = 6000;
 
 /**
- * Skills are procedural knowledge the user already curated for Claude Code.
- * nave loads that same library, so a skill written once works in both.
+ * Skills are procedural knowledge the user has already curated. nave loads them
+ * from disk, so a skill written once is available everywhere it is listed.
  */
 export const skillTool: Tool = {
   name: 'skill',

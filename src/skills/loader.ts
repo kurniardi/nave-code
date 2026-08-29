@@ -5,10 +5,9 @@ import { parseFrontmatter } from '../util/frontmatter.ts';
 import { estimateTokens } from '../util/tokens.ts';
 
 /**
- * Skills are read in place from wherever they already live — by default the
- * user's Claude Code skill library (~/.claude/skills). One library, two
- * clients: nave never forks or copies a skill, so an edit made for one tool is
- * live in the other immediately.
+ * Skills are read in place from wherever they already live. nave never forks or
+ * copies a skill, so an edit to the file on disk takes effect in the next
+ * session.
  */
 
 export interface Skill {

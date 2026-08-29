@@ -113,7 +113,7 @@ export const DEFAULT_CONFIG: NaveConfig = {
   },
   skills: {
     enabled: true,
-    // Claude Code's user skills are read in place — one library, two clients.
+    // Every skill directory is read in place; nothing is copied or imported.
     sources: ['~/.claude/skills', '~/.nave/skills', '.nave/skills'],
     mode: 'auto',
     maxInject: 80,

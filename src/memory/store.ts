@@ -234,7 +234,7 @@ export class MemoryStore {
       .map((s) => s.entry);
   }
 
-  /** Project conventions file (NAVE.md), the equivalent of CLAUDE.md. */
+  /** Project conventions file (NAVE.md). */
   conventions(): string | null {
     if (!existsSync(this.conventionsPath)) return null;
     try {

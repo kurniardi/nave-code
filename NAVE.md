@@ -7,8 +7,8 @@ every session, before anything is touched. Keep it short and true.
 
 ## What this is
 
-A terminal coding agent — Claude Code's shape, running entirely on local Ollama
-models. No API key, no billing, no cloud. Per-project memory and GPU-aware model
+A terminal coding agent that runs entirely on local Ollama models. No API key,
+no billing, no cloud. Per-project memory and GPU-aware model
 routing are the two features it exists for; everything else supports them.
 
 ## Running it
@@ -60,7 +60,7 @@ src/
 ├── providers/      Ollama client, model catalogue knowledge, router
 ├── gpu/            device detection, VRAM planning
 ├── memory/         per-project memory store
-├── skills/         reads ~/.claude/skills in place
+├── skills/         reads skill directories in place
 ├── tools/          read/write/edit/glob/grep/ls/bash/todo/memory/skill/task/http
 ├── prompt/         system prompt assembly, prompted tool-call fallback
 ├── session/        transcript persistence, compaction, permissions

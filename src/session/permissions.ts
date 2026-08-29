@@ -14,7 +14,7 @@ export interface PermissionRequest {
 export type Asker = (req: PermissionRequest) => Promise<'once' | 'always' | 'no'>;
 
 /**
- * Rule syntax mirrors Claude Code so muscle memory carries over:
+ * Rule syntax is glob based:
  *   Bash            — the whole tool
  *   Bash(npm run *) — a glob over the command
  *   Edit(src/**)    — a glob over the path

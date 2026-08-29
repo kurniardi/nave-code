@@ -6,9 +6,8 @@ Notable changes to nave-code. Format follows
 
 ## 0.1.0 — 2026-08-29
 
-First public release. A terminal coding agent shaped like Claude Code, with
-every token generated locally through [Ollama](https://ollama.com) — no API key,
-no account, no bill.
+First public release. A terminal coding agent whose every token is generated
+locally through [Ollama](https://ollama.com) — no API key, no account, no bill.
 
 ### Added
 
@@ -29,14 +28,13 @@ no account, no bill.
   `tester` and `scribe`, each with its own context window and model. Custom
   agents as Markdown in `.nave/agents/`.
 - **Skills read in place** from `~/.claude/skills`, `~/.nave/skills` and
-  `.nave/skills` — one library shared with Claude Code.
+  `.nave/skills` — never copied, and later sources shadow earlier ones by name.
 - **Tools:** `read`, `write`, `edit`, `glob`, `grep`, `ls`, `bash`,
   `bash_readonly`, `todo`, `memory`, `skill`, `task`, `http`. A file must be read
   before it is written, paths cannot escape the project, and `http` refuses
   anything that is not localhost or a private address.
 - **Permission modes** — `ask`, `acceptEdits`, `plan`, `full` — cycled mid-session
-  with Shift+Tab, with Claude Code's rule syntax (`bash(npm run *)`,
-  `edit(src/**)`).
+  with Shift+Tab, with glob rules (`bash(npm run *)`, `edit(src/**)`).
 - **Plan mode as a workflow.** `present_plan` shows the plan and offers to switch
   modes, handing back the mutating tools in the same turn so work starts with the
   plan already in context.

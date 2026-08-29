@@ -9,7 +9,7 @@ export const USER_DIR = process.env.NAVE_HOME
   ? resolve(process.env.NAVE_HOME)
   : join(HOME, '.nave');
 
-/** Claude Code's user skill directory. nave reads it in place, never copies. */
+/** Additional user skill directory. nave reads it in place, never copies. */
 export const CLAUDE_USER_DIR = join(HOME, '.claude');
 
 export const userPaths = {
