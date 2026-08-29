@@ -1,6 +1,40 @@
+# Dependencies and build output. dist/ is optional — the launcher runs src/
+# directly on Node 22.18+ — and the published package ships source, not dist.
 node_modules/
 dist/
-*.log
+*.tsbuildinfo
+
+# npm packaging. `npm pack` and a failed `npm publish` both leave a tarball
+# sitting in the repo root.
+*.tgz
+
+# Secrets. nave itself reads none of these, but nothing else should either.
+.env
+.env.*
+
+# nave's own runtime files.
+# .nave/memory/ and NAVE.md are deliberately NOT ignored — they are how the
+# project shares context with the agent, and they belong in the repo.
+# Transcripts and cache are noise.
 .nave/sessions/
 .nave/cache/
+
+# Logs
+*.log
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
+
+# Claude Code per-machine overrides. Shared settings.json may be committed;
+# settings.local.json is personal by definition.
+.claude/settings.local.json
+
+# OS artefacts. Thumbs.db in particular appears the moment icons/ is opened
+# in Windows Explorer.
 .DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
