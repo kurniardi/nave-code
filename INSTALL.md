@@ -171,6 +171,17 @@ Same command on every platform — PowerShell, cmd, macOS and Linux alike:
 npm install -g nave-code
 ```
 
+**Run it from anywhere. You do not need to create a folder first.** The `-g`
+means global: npm installs nave into its own directory, not into whichever
+folder your terminal happens to be in. Nothing is written next to your code, and
+no `node_modules` appears where you ran it.
+
+If you want to see where it went:
+
+```bash
+npm root -g
+```
+
 That is the whole install. nave has **zero runtime dependencies**: npm fetches
 the package and nothing else.
 
@@ -275,8 +286,31 @@ nave models
 
 ## 5. Your first session
 
+**This is where a folder matters.** nave works on the directory you start it in
+— it reads and edits the files there, and keeps that project's memory there.
+So move into a project first.
+
+Already have one:
+
 ```bash
-cd your-project
+cd path/to/your-project
+```
+
+Starting from scratch? Make one:
+
+```bash
+mkdir my-project
+cd my-project
+git init
+```
+
+`git init` is optional, but worth doing: nave adds a rule to `.gitignore` for
+its transcripts, and a repository is what lets you see and undo what nave
+changed.
+
+Then, inside that folder:
+
+```bash
 nave init      # creates NAVE.md and .nave/memory
 nave           # start
 ```
