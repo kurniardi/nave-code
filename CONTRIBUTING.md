@@ -13,8 +13,10 @@ npm install          # typescript + @types/node, dev only
 npm link             # puts `nave` on your PATH from this checkout
 ```
 
-There is no build step. `npm run dev` runs `node src/index.ts` directly on Node
-22.18+, which strips the types as it loads.
+In a checkout there is no build step day to day: `npm run dev` runs
+`node src/index.ts` directly on Node 22.18+, which strips the types as it loads.
+Packaging is different — `npm pack` and `npm publish` run the build through
+`prepack`, because an installed copy under `node_modules` can only run `dist/`.
 
 Full environment setup — Node, Ollama, models — is in
 [`INSTALL.md`](INSTALL.md).

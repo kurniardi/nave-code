@@ -60,11 +60,14 @@ jobs:
           mkdir -p /tmp/pack
           npm pack --pack-destination /tmp/pack
 
-      # Guards the `files` list. nave ships source and no build output, so if
-      # something needed at runtime falls outside `files`, only running the
-      # tarball from outside the repo will show it.
-      - name: Run nave from the tarball, outside the repo
+      # Install it the way a user does. Extracting the tarball to a plain
+      # directory is NOT enough: Node refuses to strip TypeScript types under
+      # node_modules, so a package that ships only src/ passes a plain
+      # extraction and then fails on every real install. That shipped as 0.1.0.
+      - name: Install from the tarball and run it
         run: |
-          cd /tmp/pack
-          tar -xzf nave-code-*.tgz
-          node package/bin/nave.mjs --help
+          mkdir -p /tmp/consumer
+          cd /tmp/consumer
+          npm init -y
+          npm install /tmp/pack/nave-code-*.tgz
+          ./node_modules/.bin/nave --help

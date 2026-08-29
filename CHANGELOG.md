@@ -4,6 +4,25 @@ Notable changes to nave-code. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.1.1 — 2026-08-29
+
+### Fixed
+
+- **`npm install -g nave-code` produced an install that could not start.**
+  0.1.0 shipped source and no build output, on the reasoning that Node 22.18+
+  runs TypeScript directly. It does — except under `node_modules`, where Node
+  refuses to strip types and throws
+  `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`. Every install of 0.1.0 hit
+  this on first run.
+
+  The package now ships `dist/` alongside `src/`, built automatically by a
+  `prepack` script, and the launcher runs the compiled entry whenever it finds
+  itself under `node_modules`. Source maps still point at `src/`, so stack
+  traces stay readable. A checkout is unchanged: it runs `src/` directly and
+  only prefers `dist/` while that is the fresher of the two.
+
+  0.1.0 is deprecated on npm.
+
 ## 0.1.0 — 2026-08-29
 
 First public release. A terminal coding agent whose every token is generated
@@ -48,8 +67,7 @@ locally through [Ollama](https://ollama.com) — no API key, no account, no bill
 
 ### Notes
 
-- Requires Node 22.18 or newer. nave runs its TypeScript directly, so the
-  published package contains source and no build output.
+- Requires Node 22.18 or newer.
 - Zero runtime dependencies.
 - Known rough edge: in plan mode a 7B model often narrates the first step instead
   of taking it. nave nudges twice while todos remain open, then stops. Larger

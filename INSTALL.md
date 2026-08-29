@@ -7,7 +7,7 @@ You install three things, in this order:
 
 | | What | Why |
 |---|---|---|
-| 1 | **Node 22.18+** | nave runs its TypeScript directly on Node — there is no build step |
+| 1 | **Node 22.18+** | the runtime nave needs; 22.18 is the oldest version it is tested on |
 | 2 | **Ollama** | the local server that actually runs the models |
 | 3 | **nave-code** | one `npm install -g`, zero runtime dependencies |
 
@@ -20,9 +20,8 @@ have, including nothing, and sizes itself to fit.
 
 ## 1. Node
 
-nave needs **Node 22.18 or newer**. That is the release where Node learned to
-run TypeScript directly, which is why nave ships no build output. Node 24 LTS is
-recommended.
+nave needs **Node 22.18 or newer** — the oldest version it is tested against on
+Windows, macOS and Linux. Node 24 LTS is recommended.
 
 ### Windows — PowerShell
 
@@ -185,7 +184,7 @@ nave doctor
 tells you what to fix:
 
 ```
-  nave-code v0.1.0 ────────────────────────────────────────────────
+  nave-code v0.1.1 ────────────────────────────────────────────────
   local-first coding agent, powered by your own GPU
   checking this machine
 
@@ -379,9 +378,11 @@ npm test
 npm link             # puts `nave` on your PATH from this checkout
 ```
 
-`npm run dev` runs `node src/index.ts` directly. There is no build step unless
-you want one — `npm run build` produces `dist/` for a faster cold start, and the
-launcher prefers it only while it is newer than `src/`.
+`npm run dev` runs `node src/index.ts` directly, so day to day there is no build
+step in a checkout. `npm run build` produces `dist/`, and the launcher prefers it
+only while it is newer than `src/`. Packing runs the build for you: the published
+package has to carry `dist/`, because Node refuses to strip types under
+`node_modules`.
 
 Read [`NAVE.md`](NAVE.md) before changing anything; it is the brief nave itself
 follows in this repo.

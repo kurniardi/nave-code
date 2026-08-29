@@ -43,8 +43,8 @@ model with copy-paste commands for Windows (PowerShell and cmd), macOS and Linux
 
 Full per-platform setup: [INSTALL.md](INSTALL.md).
 
-nave has **zero runtime dependencies**. It runs its own TypeScript directly on
-Node, so there is nothing to build and nothing to install from npm at runtime.
+nave has **zero runtime dependencies**. Installing it fetches the package and
+nothing else, and running it reaches nothing but your own Ollama server.
 
 ---
 

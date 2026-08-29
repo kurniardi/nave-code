@@ -1,9 +1,16 @@
 #!/usr/bin/env node
 // nave-code launcher.
 //
-// Prefers the compiled build, but only while it is actually current: Node >=
-// 22.18 runs the TypeScript directly, so a stale dist/ would otherwise make
-// `nave` silently run yesterday's code after you edit src/.
+// Two situations, and they want opposite things:
+//
+//   Installed (under node_modules) — must run dist/. Node refuses to strip
+//   types for anything under node_modules and throws
+//   ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING, so src/ is not an option
+//   there no matter how new the Node is.
+//
+//   A checkout — prefers the compiled build, but only while it is actually
+//   current. Node >= 22.18 runs the TypeScript directly, so a stale dist/
+//   would otherwise make `nave` silently run yesterday's code after an edit.
 import { existsSync, statSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -36,13 +43,27 @@ function newestMtime(dir) {
   return newest;
 }
 
-let entry = source;
-if (existsSync(compiled)) {
+const installed = root.split(/[\\/]/).includes('node_modules');
+
+let entry;
+if (installed) {
+  if (!existsSync(compiled)) {
+    console.error(
+      'nave: this install is missing its build output (dist/).\n' +
+        'Reinstall with "npm install -g nave-code", or report it at\n' +
+        'https://github.com/kurniardi/nave-code/issues'
+    );
+    process.exit(1);
+  }
+  entry = compiled;
+} else if (existsSync(compiled)) {
   try {
     entry = statSync(compiled).mtimeMs >= newestMtime(join(root, 'src')) ? compiled : source;
   } catch {
     entry = compiled;
   }
+} else {
+  entry = source;
 }
 
 try {
